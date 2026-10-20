@@ -2,3 +2,7 @@
 .claude/
 .codegraph/
 .wolf/
+node_modules/
+.vuepress/dist/
+.vuepress/.cache/
+.vuepress/.temp/

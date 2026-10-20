@@ -17,15 +17,27 @@ no tests, no lint config, no CI. Remote: `git@github.com:justfortytwo/docs.git`.
 
 ```
 README.md      Repo intro + Index of design docs (keep in sync when adding docs)
+architecture.md  Cross-repository system overview (ownership map, principles)
 scheduler.md   Scheduler & Durable Jobs design (jobs table, JobStore, tick,
                token-gating, event hooks, crash-safety, MVP scope)
-.gitignore     Ignores .DS_Store only
+packages/      One reference page per @justfortytwo/* package
+.vuepress/     VuePress site config (config.ts)
+package.json   Site toolchain (vuepress 2.0.0-rc.31, vite bundler, default theme)
+.gitignore     Ignores .DS_Store, agent dirs, node_modules, VuePress build output
 ```
 
 ## Commands
 
-There are none. No `package.json`, Makefile, or scripts exist. Verify changes by
-reading the rendered Markdown (e.g. on GitHub) and checking relative links.
+The docs are built as a VuePress site:
+
+```sh
+npm install      # once
+npm run dev      # local dev server
+npm run build    # static site into .vuepress/dist/
+```
+
+Verify changes by reading the rendered Markdown (dev server or GitHub) and
+checking relative links — the build warns about broken links.
 
 ## Conventions (observed in existing docs)
 
