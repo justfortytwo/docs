@@ -1,17 +1,9 @@
----
-home: true
-title: fortytwo
-heroImage: null
-tagline: A local-first personal-assistant spine, distributed as the @justfortytwo/* packages.
-actions:
-  - text: Architecture overview
-    link: /architecture.html
-    type: primary
-  - text: Packages
-    link: /packages/
-    type: secondary
-footer: MIT © 2026 Enrico Deleo · Created and maintained by Enrico Deleo
----
+# fortytwo
+
+**fortytwo** is a local-first personal-assistant spine, distributed as the
+`@justfortytwo/*` packages. Start with the
+[architecture overview](./architecture.md) or browse the
+[package reference](./packages/).
 
 This repository holds the canonical, publishable design and architecture
 documentation for **fortytwo** — the decisions and contracts that span packages

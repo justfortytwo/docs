@@ -1,3 +1,4 @@
+import { searchPlugin } from '@vuepress/plugin-search'
 import { viteBundler } from '@vuepress/bundler-vite'
 import { defaultTheme } from '@vuepress/theme-default'
 import { defineUserConfig } from 'vuepress'
@@ -19,6 +20,13 @@ export default defineUserConfig({
     '!AGENTS.md',
   ],
 
+  plugins: [
+    searchPlugin({
+      // index h2/h3 text so headings match too
+      getExtraFields: () => [],
+    }),
+  ],
+
   theme: defaultTheme({
     repo: 'justfortytwo/docs',
 
@@ -26,7 +34,12 @@ export default defineUserConfig({
       { text: 'Architecture', link: '/architecture.html' },
       { text: 'Packages', link: '/packages/' },
       { text: 'Design', link: '/scheduler.html' },
+      { text: 'forty-two.it', link: 'https://forty-two.it/' },
     ],
+
+    lastUpdated: true,
+    editLink: true,
+    contributors: false,
 
     sidebar: {
       '/packages/': [
