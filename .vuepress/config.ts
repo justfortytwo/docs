@@ -11,13 +11,14 @@ export default defineUserConfig({
 
   bundler: viteBundler(),
 
-  // Keep agent-instruction files out of the rendered site.
+  // Keep agent-instruction files and superpowers/ specs/plans off the site.
   pagePatterns: [
     '**/*.md',
     '!.vuepress',
     '!node_modules',
     '!CLAUDE.md',
     '!AGENTS.md',
+    '!superpowers',
   ],
 
   plugins: [

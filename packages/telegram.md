@@ -113,10 +113,38 @@ a memory-backed `BindingStore` — the login flow is unaffected.
 | --- | --- | --- |
 | `@justfortytwo/runner` (pinned `1.0.0-1`) | Claude process/session lifecycle | library API |
 | `@justfortytwo/gate` (regular dep) | `createSourceEnvelope` provenance helper in `attachments.ts` — the *policy hook* stays optional and separately configured | `POLICY_SCHEMA_VERSION` |
-| `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the memory DB at startup and persists each channel event; recall happens inside the headless `claude` turn via the memory MCP tools | `MEMORY_TOOL_CONTRACT_VERSION` |
+| `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the shared DB at startup; recall happens inside the headless `claude` turn via the memory MCP tools | `MEMORY_TOOL_CONTRACT_VERSION` |
+| `@justfortytwo/transcript` *(new, optional peer, loaded dynamically)* | the `ConversationLog` implementation that persists each channel event (see below) | `createTranscript` / `prepareTranscript` |
 
 If the memory peer is absent, the bridge degrades to **channel-only**
 (messages relay but are not persisted) rather than refusing to start.
+
+### Conversation log
+
+The bridge no longer stores chat in memory (memory holds facts only). It
+writes every inbound and outbound event through a small port it defines
+itself, `ConversationLog` (`src/conversation-log.ts`):
+
+```ts
+interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
+```
+
+- The port is structural: telegram imports no transcript or memory types for
+  it. The event carries `channel`, `direction`, `actor`, `kind`, `content`,
+  and optional `threadId` and `meta`.
+- `loadConversationLog(h, embedder)` dynamically imports
+  `@justfortytwo/transcript`, calls `prepareTranscript` and
+  `createTranscript`. If transcript is not installed, or loading fails, it
+  logs to stderr and returns `noopConversationLog`, preserving channel-only
+  behavior. The bridge's composition root uses the no-op when memory itself is
+  absent.
+- **Fire-and-forget.** The bridge never awaits the log in the reply path;
+  a failed `append` (sync or async) is logged and the bridge continues. A slow
+  embedding can never delay a reply or stall the poll loop. Call order is
+  preserved because `append` inserts synchronously.
+
+The transcript package is planned for the 1.0.0 prerelease train; not yet
+published.
 
 ## Environment
 
@@ -127,7 +155,7 @@ If the memory peer is absent, the bridge degrades to **channel-only**
 | `CLAUDE_BIN` | no | Path to `claude` (default `claude`). |
 | `TELEGRAM_BINDINGS_DB` | no | Bindings db path (default `state/telegram-bindings.db`). |
 | `DB_PATH` | no | Memory db path (default `db/fortytwo.db` relative to `FORTYTWO_ROOT`). |
-| `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Embedder for memory persistence. |
+| `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Embedder handed to the conversation log (vectors are produced in the background). |
 | `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + journal actor labels. |
 | `FORTYTWO_ROOT` | no | Working root for the headless `claude` process + state files (`FORD_ROOT` is a deprecated alias). |
 
@@ -167,7 +195,8 @@ the repo README (test bot, mid-turn second message, restart-resume).
 
 **In scope:** Telegram identity, pairing/bindings, message transport,
 attachment ingestion + provenance, chat→session mapping, reply coalescing,
-journal persistence via memory.
+writing channel events through the injected `ConversationLog` (persistence is
+owned by `@justfortytwo/transcript`).
 
 **Out of scope:** agent execution (Claude Code), process lifecycle (runner),
 proactive wakes (scheduler), durable tool authorization (Claude Code

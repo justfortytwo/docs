@@ -30,7 +30,10 @@ supporting components.
 - [`@justfortytwo/persona`](./packages/persona.md) — persona and context
   templates rendered into an installation.
 - [`@justfortytwo/memory`](./packages/memory.md) — durable semantic-memory MCP
-  server.
+  server (facts only; extensible with MCP extensions).
+- [`@justfortytwo/transcript`](./packages/transcript.md) *(new)* — searchable
+  conversation log in the same database; planned for the 1.0.0 prerelease
+  train, not yet published.
 - [`@justfortytwo/runner`](./packages/runner.md) — Claude Code process/session
   runtime.
 - [`@justfortytwo/scheduler`](./packages/scheduler.md) — durable scheduling and

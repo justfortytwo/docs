@@ -46,7 +46,8 @@ channels / scheduler
         |
         +---- MCPs / plugins / skills / tools
         |
-        +---- fortytwo memory
+        +---- fortytwo memory (facts)
+        |        + transcript tools (extension seam)
 
 optional surrounding components:
 - gate
@@ -66,7 +67,8 @@ bootstrap / distribution / documentation:
 | --- | --- |
 | Agent reasoning, planning, subagents, tools, MCP orchestration, plugins | the agent runtime |
 | Claude process/session lifecycle | `@justfortytwo/runner` |
-| Durable memory | `@justfortytwo/memory` |
+| Durable memory: **facts only** | `@justfortytwo/memory` |
+| Conversation history (every channel message, kept forever, searchable) | `@justfortytwo/transcript` *(new)* |
 | Durable time and scheduled execution | `@justfortytwo/scheduler` |
 | Telegram transport and Telegram identity | `@justfortytwo/telegram` |
 | Installation and lifecycle management | `@justfortytwo/installer` |
@@ -84,6 +86,37 @@ A useful rule when deciding where code belongs:
 For example: browser automation should normally come from an existing
 MCP/plugin rather than a fortytwo-specific browser implementation.
 
+## Memory, transcript and the shared database
+
+memory holds **facts**; conversation history belongs to
+`@justfortytwo/transcript`. Both live in the same SQLite file (`fortytwo.db`)
+but in separate tables, and there is one MCP server, not two.
+
+```text
+telegram ──┐ ConversationLog.append (injected, fire-and-forget)
+scheduler ─┤                                   ┌─ memory tables (facts)
+           └──▶ transcript tables ─────────────┤  same fortytwo.db
+                      ▲                        └─ transcript_* tables
+                      │ createMcpExtension
+agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP_EXTENSIONS
+          (memory tools + transcript_search / transcript_context)
+```
+
+- **Writers are decoupled.** telegram and scheduler each define a structural
+  `ConversationLog` port and load the transcript implementation dynamically;
+  without it they fall back to a no-op. Neither imports transcript or memory
+  types for this.
+- **Readers go through an extension seam.** memory exposes an `McpExtension`
+  interface and loads extension packages named in `FORTYTWO_MCP_EXTENSIONS`.
+  memory has no static dependency on transcript, so there is no cycle.
+- **Dependency direction.** transcript depends on memory for DB plumbing
+  only; memory never depends on transcript.
+- **Oneiros reads two evidence streams** (memory and transcript), each with
+  its own cursor.
+
+`@justfortytwo/transcript` is planned for the 1.0.0 prerelease train and is
+not yet published.
+
 ## Canonical project locations
 
 - Website: `forty-two.it`
@@ -92,9 +125,9 @@ MCP/plugin rather than a fortytwo-specific browser implementation.
 
 ## Key guarantees
 
-- **Channel-agnostic output.** Agent output is always written to the memory
-  journal; Telegram (or any other channel) is an optional notifier, never the
-  system of record.
+- **Channel-agnostic output.** Agent output is always written to the
+  conversation log (the transcript when installed); Telegram (or any other
+  channel) is an optional notifier, never the system of record.
 - **Single writer for job execution.** Producers only insert `pending` rows;
   the scheduler daemon is the single writer of the `running` transition.
 - **No scheduler↔telegram coupling.** Both depend on `runner`; neither depends
@@ -102,9 +135,9 @@ MCP/plugin rather than a fortytwo-specific browser implementation.
 
 ## Scope
 
-**In scope (MVP):** installer bootstrap, persona rendering, memory journal and
-registry, runner process lifecycle, scheduler with durable jobs, Telegram
-channel.
+**In scope (MVP):** installer bootstrap, persona rendering, memory (facts)
+and registry, the transcript (conversation log), runner process lifecycle,
+scheduler with durable jobs, Telegram channel.
 
 **Deferred / optional:** gate policy enforcement, salience extraction,
 additional channels beyond Telegram.

@@ -78,6 +78,40 @@ import {
 `memoryToolContract` is the authoritative human-readable list of tools and
 their guarantees, kept in sync with the wire schema in `src/tools.ts`.
 
+## Extension seam
+
+memory holds **facts only**. Sibling packages can add MCP tools to the same
+server without memory depending on them, through the `McpExtension` interface
+(`src/extension.ts`):
+
+```ts
+interface McpExtension {
+  tools(): Tool[];
+  call(name: string, args: Record<string, unknown>): Promise<unknown | undefined>;
+  instructions?: string;
+}
+```
+
+- `call` returns `undefined` for tools the extension does not own.
+- `createServer(h, embedder, extensions = [])` is exported from the package
+  index. Memory's tools come first, extension tools are appended, and
+  extension `instructions` are appended to memory's. An extension tool whose
+  name collides with an existing tool is skipped (logged to stderr).
+- **`FORTYTWO_MCP_EXTENSIONS`** is a comma-separated list of package names.
+  At startup memory imports each one dynamically and calls its exported
+  `createMcpExtension(h, embedder)`. A module that fails to load or does not
+  export that function is logged to stderr and skipped; the server still
+  starts. When the variable is unset memory behaves as before.
+- Extension tools are outside `memoryToolContract`; they never bump
+  `MEMORY_TOOL_CONTRACT_VERSION`.
+
+The first extension is `@justfortytwo/transcript`, which adds
+`transcript_search` and `transcript_context` (see
+[transcript](./transcript.md)). Conversation history is no longer stored in
+memory: the Telegram bridge and scheduler write to the transcript, and the
+installer migrates existing chat rows out. This is planned for the 1.0.0
+prerelease train; not yet published.
+
 ## Data model
 
 SQLite via `better-sqlite3` + `knex` migrations (`src/migrations/`, applied by
@@ -194,10 +228,11 @@ RUN_OLLAMA_TESTS=1 ...  # opt-in live-Ollama embedder test
 
 ## Scope
 
-**In scope:** the memory store, hybrid recall, contract-versioned MCP tool
-surface, doc indexing, enrichment intake, gate approval store, incremental
-delta reads.
+**In scope:** the memory store (facts), hybrid recall, contract-versioned MCP
+tool surface, the MCP extension seam, doc indexing, enrichment intake, gate
+approval store, incremental delta reads.
 
 **Out of scope:** the salience model call (owned by `@justfortytwo/salience`),
 deletion over MCP (owner-privileged, via the installer's `forget`), persona or
-journal semantics.
+journal semantics, conversation history (owned by
+`@justfortytwo/transcript`).

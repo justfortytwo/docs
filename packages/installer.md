@@ -147,6 +147,50 @@ no `ollama` CLI needed on the installer's machine) and `doctor` verifies it.
 `--ollama-base-url` (or the interactive question) threads the endpoint into
 both `.env` and the memory server's `.mcp.json` entry.
 
+## MCP extensions and the transcript
+
+When `@justfortytwo/transcript` is installed, `init` and `update` wire it into
+the `fortytwo-memory` entry of `.mcp.json` (planned for the 1.0.0 prerelease
+train; not yet published):
+
+- `FORTYTWO_MCP_EXTENSIONS=@justfortytwo/transcript` is set in the entry's
+  `env`. memory reads it and loads the extension (see
+  [memory](./memory.md#extension-seam)). Without transcript installed the
+  variable is omitted and the entry is unchanged.
+- **Launch form.** Without extensions the entry runs
+  `npx -y @justfortytwo/memory`. With extensions it runs
+  `npx -y -p @justfortytwo/memory -p @justfortytwo/transcript fortytwo-memory`.
+  memory resolves extensions from its *own* npx install, so every package must
+  share one npx prefix; `-p` for each package guarantees that.
+- **`update` re-wires `.mcp.json` first** (`reconcileRuntime`), before the chat
+  migration, so moving chat out of memory never leaves the agent without
+  transcript search.
+- **`doctor`** has a warn-only `mcp extensions` check: it warns if transcript
+  is installed but not listed in `FORTYTWO_MCP_EXTENSIONS` (re-run
+  `fortytwo init`), or if the variable names a package that is not installed.
+  A missing extension loses its tools but memory itself still works.
+
+### Chat migration
+
+`init` and `update` run a one-off, idempotent move of chat history out of
+memory into the transcript (`src/transcript-migration.ts`). It is skipped when
+memory or transcript is not installed. Order:
+
+1. Map every `telegram:*` and `scheduler:wake` memory row to a transcript row
+   (pure; a malformed row fails before any write).
+2. Import in batches of 100, one transaction each. Import is idempotent on
+   `legacy_memory_id`, so a re-run after a crash imports nothing twice.
+   Vectors are copied from `memory_vec`; no embedder is needed.
+3. Verify every source row has a transcript row with identical content.
+4. Only then delete from memory with `deleteByIds`, all in one transaction;
+   any failure leaves memory intact.
+5. If persona is installed and has a memory checkpoint but no transcript
+   checkpoint, initialize the transcript cursor so Oneiros resumes where it
+   left off (never overwriting an existing cursor).
+
+Output reports `moved N chat row(s) from memory to the transcript` when rows
+moved.
+
 ## Oneiros installation and upgrades
 
 `init` automatically initializes Oneiros at the current memory head and seeds

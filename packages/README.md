@@ -12,6 +12,7 @@ package is, how it is built, and how it connects to its siblings.
 | [`@justfortytwo/installer`](./installer.md) | `1.0.0-14` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
 | [`@justfortytwo/persona`](./persona.md) | `1.0.0-2` | Persona and context templates + Oneiros |
 | [`@justfortytwo/memory`](./memory.md) | `1.0.0-2` | Durable semantic-memory MCP server |
+| [`@justfortytwo/transcript`](./transcript.md) *(new)* | `1.0.0-0` (source; not yet published) | Searchable conversation log, separate from memory |
 | [`@justfortytwo/runner`](./runner.md) | `1.0.0-1` | Claude Code process/session runtime |
 | [`@justfortytwo/scheduler`](./scheduler.md) | `1.0.0-3` | Durable scheduling and proactive jobs |
 | [`@justfortytwo/telegram`](./telegram.md) | `1.0.0-7` | Telegram transport/channel adapter |

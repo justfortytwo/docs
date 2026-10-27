@@ -52,19 +52,22 @@ cheap check that runs **before** an LLM turn is spent.
 |------|----------|------|----------|
 | `daily_briefing` | `57 7 * * *` UTC | none | runs the daily-briefing skill and sends the rundown |
 | `sweep` | `3 13,18 * * *` | pending approvals > 0 | open-thread sweep, one-line status |
-| `learn_review` | `17 9 * * 0` | recent memories (7 d) > 0 | propose-only pattern promotion from the Journal |
+| `learn_review` | `17 9 * * 0` | recent memory rows (7 d) > 0; counts facts only, since chat and notifications moved to the transcript | propose-only pattern promotion from recent memory |
 | `notify_pending` | one-off | none | notify about pending items |
 | `reply` | one-off | none | send a reply via the runner |
 | `reminder` | one-off | none | send a reminder via the runner |
 | `reembed_memory` | maintenance | none | re-embeds one memory by id in-place (**no LLM**, no notification) |
-| `persona.oneiros` | `17 3 * * *` UTC | memory-head check | persona maintenance (below) |
+| `persona.oneiros` | `17 3 * * *` UTC | memory-head or transcript-head check | persona maintenance (below) |
 
 ## Oneiros maintenance
 
 `persona.oneiros` runs daily at `17 3 * * *` UTC with null payload and the
 existing durable retry/claim mechanism. The installer seeds it after
 initializing persona's checkpoint; daemon boot reconciles the same job when
-the checkpoint exists. The cheap gate checks the memory head.
+the checkpoint exists. The cheap gate checks both evidence heads: the memory
+head and, when `@justfortytwo/transcript` loads, the transcript head
+(`loadTranscriptSource` in `src/oneiros.ts` adapts `transcriptHead` /
+`transcriptDelta`). Without transcript only the memory stream runs.
 
 Persona validates and applies additions; the scheduler runs the private
 prompt through `@justfortytwo/runner` in an isolated temporary cwd:
@@ -103,6 +106,27 @@ containing `{ "pid", "ts" }`. The write is outside the poll's overlap guard so
 a long-running turn never starves it. `fortytwo doctor` warns (non-fatal) if
 the file is missing or older than 90 seconds.
 
+## Notification journal
+
+Every notification is fanned out to a journal notifier plus optional extra
+notifiers (e.g. Telegram). The journal notifier no longer writes
+`scheduler:wake` memories: it appends to the transcript through a
+`ConversationLog` port that scheduler defines itself
+(`src/conversation-log.ts`), with channel `scheduler`, direction `outbound`,
+actor `assistant` and kind = the notification kind.
+
+- The port is structural; scheduler imports no transcript or memory types for
+  it. `loadConversationLog(h, embedder)` imports `@justfortytwo/transcript`
+  dynamically and falls back to `noopConversationLog` (logged to stderr,
+  journal entries then are not recorded) if it is missing or fails.
+- **Fire-and-forget.** `makeJournalWrite` never propagates failures, so a
+  broken transcript cannot affect the job or other notifiers.
+- The `learn_review` gate (`recentCount`) counts memory rows from the last
+  7 days. With chat and notifications gone from memory it counts facts only,
+  so it fires less often; this is accepted as is.
+
+This is planned for the 1.0.0 prerelease train; not yet published.
+
 ## Dependencies
 
 - `@justfortytwo/memory` (pinned `1.0.0-2`) — the `jobs` table and `JobStore`.
@@ -110,6 +134,8 @@ the file is missing or older than 90 seconds.
 - `@justfortytwo/persona` (pinned `1.0.0-2`) — Oneiros `hasWork`/`refine`/
   `workerPrompt`.
 - `@justfortytwo/telegram` — **optional peer**; enables the Telegram notifier.
+- `@justfortytwo/transcript` *(new)* — **optional peer**; receives journal
+  entries and serves the Oneiros transcript stream.
 
 ## Testing
 
