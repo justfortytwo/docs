@@ -18,8 +18,8 @@ lifecycle entirely to runner — it makes no provider or model decisions.
 
 1. **Transport.** Each active authorized chat normally has one live
    RunnerSession. After authorization, attachment ingestion and optional
-   journaling, input waits only for `session.send()` to write it. Polling
-   continues while Claude works; another message goes to the same session
+   conversation logging, input waits only for `session.send()` to write it.
+   Polling continues while Claude works; another message goes to the same session
    immediately after preprocessing.
 2. **Output and deferrals.** Complete assistant-message events are coalesced
    into an evolving Telegram reply, edited at most once per second during
@@ -156,7 +156,7 @@ published.
 | `TELEGRAM_BINDINGS_DB` | no | Bindings db path (default `state/telegram-bindings.db`). |
 | `DB_PATH` | no | Memory db path (default `db/fortytwo.db` relative to `FORTYTWO_ROOT`). |
 | `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Embedder handed to the conversation log (vectors are produced in the background). |
-| `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + journal actor labels. |
+| `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + conversation-log actor labels. |
 | `FORTYTWO_ROOT` | no | Working root for the headless `claude` process + state files (`FORD_ROOT` is a deprecated alias). |
 
 Proxy auth for the headless `claude` session is not read here — the CLI reads
@@ -173,7 +173,7 @@ node dist/bridge.js
 Run under a restart loop (tmux/systemd) — or under `fortytwo start`, which
 supervises it together with the scheduler. Attachments: photo/document
 **captions** are preserved in the same Claude turn as attachment details and
-in inbound journal text; message text takes precedence when present.
+in inbound conversation-log text; message text takes precedence when present.
 
 ## Notable API history
 

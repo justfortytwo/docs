@@ -5,7 +5,7 @@ free-form provenance and recalls them by meaning (vector search), by keyword
 (FTS5), or by structured filter. Backed by SQLite + [`sqlite-vec`], with
 embeddings from a local Ollama model (or an opt-in remote provider).
 
-It is **persona-agnostic**: no journal/persona/approval coupling, just a
+It is **persona-agnostic**: no chat/persona/approval coupling, just a
 generic memory store and tool surface. It can be used on its own, as a library,
 or as a Claude Code plugin.
 
@@ -234,5 +234,5 @@ approval store, incremental delta reads.
 
 **Out of scope:** the salience model call (owned by `@justfortytwo/salience`),
 deletion over MCP (owner-privileged, via the installer's `forget`), persona or
-journal semantics, conversation history (owned by
+chat semantics, conversation history (owned by
 `@justfortytwo/transcript`).

@@ -31,9 +31,11 @@ through one mechanism.
   recurrence math are pure DB/JS and effectively free. An LLM turn happens *only*
   behind a gate that has already confirmed there is work.
 - **Durable state lives in `memory`.** Jobs are assistant state and belong next
-  to the journal and registry, in one database — not in a second store.
-- **Channel-agnostic output.** Every result is written to the journal; channels
-  (Telegram today, others later) are *optional notifiers*, never a dependency.
+  to the registry, in one database — not in a second store.
+- **Channel-agnostic output.** Every result is written to the conversation log
+  (the transcript when `@justfortytwo/transcript` is installed; otherwise
+  dropped); channels (Telegram today, others later) are *optional notifiers*,
+  never a dependency.
 - **One mechanism for every job shape** — recurring, one-off, and reactive jobs
   are all rows in the same table, drained by the same loop.
 
@@ -75,7 +77,7 @@ Four packages, each with one job:
    │  jobs table  │      │     notify(result) ─────┘    │
    └──────────────┘      └──────────────┬──────────────┘
                                         │ notify
-                            journal (always) + Telegram (if configured)
+                  conversation log (always) + Telegram (if configured)
 ```
 
 ## Data model
@@ -123,8 +125,9 @@ Each is small and independently testable.
   onto the p-queue; on completion, notify and (if recurring) reschedule.
 - **`daemon`** — the only impure part. Wires croner + the ~30s poll + the real
   `JobStore` + the runner + the notifier.
-- **`Notifier`** interface — `notify(result)`. The default writes to the
-  **memory journal** (always). An optional **Telegram notifier** (push to the
+- **`Notifier`** interface — `notify(result)`. The default appends to the
+  **conversation log** (the transcript when `@justfortytwo/transcript` is
+  installed; otherwise dropped). An optional **Telegram notifier** (push to the
   owner chat) is injected only when configured.
 
 ## Job kinds — one table, four uses
@@ -218,8 +221,9 @@ interactive messages.
   `pending` so they re-run.
 - **Failures.** Increment `attempts`, store `last_error`, and retry with a fixed
   MVP schedule — **3 attempts** at **1 min → 5 min → 30 min**. After the cap the
-  row is marked `failed` and a journal note is written. (A tunable backoff policy
-  is deferred.)
+  row is marked `failed` and a note is written to the conversation log (the
+  transcript when installed; otherwise dropped). (A tunable backoff policy is
+  deferred.)
 - **Serialized turns.** p-queue concurrency 1 keeps LLM turns from overlapping.
 
 ## Testing
