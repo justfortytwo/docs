@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`** — the install-time alias; with no verb it runs `init`.
 - **`fortytwo`** — the everyday lifecycle alias.
 
-- **Version:** `1.0.0-14` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.0.0-15` *planned* (published: `1.0.0-14`) · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -57,7 +57,7 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, provision local infra (embedder model, memory DB migration), record the installed version set. |
 | `pair` | Issue a one-time `/login` pairing code, persisted to the bridge's bindings db (dynamic counterpart of the static `ALLOWED_CHAT_IDS` allowlist). Refuses when Telegram isn't running, unless `--force`. |
 | `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only). |
-| `update` | Resolve the latest in-range version of each **installed** engine package, install it, rotate the rollback baseline, then run `doctor`. `--dry-run` reports without installing. |
+| `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline, then run `doctor`. `--dry-run` reports without installing. |
 | `rollback` | Re-install the previous version set recorded before the last `update`, then run `doctor`. Manual by design — never auto-triggered. |
 | `enrich` | Capture more answers to deepen the persona, then re-render (no clobber). |
 | `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until` — previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
@@ -72,18 +72,24 @@ peer resolution:
 ```jsonc
 "fortytwo": {
   "compat": {
-    "@justfortytwo/memory": "1.0.0-2",
+    "@justfortytwo/memory": "1.0.0-3",
     "@justfortytwo/gate": "^0.1.0",
-    "@justfortytwo/persona": "1.0.0-2",
-    "@justfortytwo/telegram": "1.0.0-7",
-    "@justfortytwo/scheduler": "1.0.0-3"
+    "@justfortytwo/persona": "1.0.0-3",
+    "@justfortytwo/telegram": "1.0.0-8",
+    "@justfortytwo/scheduler": "1.0.0-4",
+    "@justfortytwo/transcript": "^1.0.0-0"
   }
 }
 ```
 
 `init` installs these ranges, `doctor` cross-checks the *installed* siblings
 against them, `update` resolves latest-in-range and records the set into
-`.fortytwo/state.json` for rollback. telegram and scheduler pull in
+`.fortytwo/state.json` for rollback. `update` moves only the siblings already
+installed, with one exception: when memory is installed and a declared memory
+companion (today `@justfortytwo/transcript`) is missing, `update` installs it,
+so chat keeps being recorded. `doctor` and `status` warn (without failing) when
+memory is installed but the declared transcript is not. This compat block is
+the planned `1.0.0-15` contract. telegram and scheduler pull in
 `@justfortytwo/runner` themselves — the installer never installs runner
 directly. Pass `--no-install` to manage engine packages yourself.
 
@@ -156,7 +162,16 @@ train; not yet published):
 - `FORTYTWO_MCP_EXTENSIONS=@justfortytwo/transcript` is set in the entry's
   `env`. memory reads it and loads the extension (see
   [memory](./memory.md#extension-seam)). Without transcript installed the
-  variable is omitted and the entry is unchanged.
+  variable is removed.
+- **The entry is rewritten, its env preserved.** Each re-wire rewrites
+  `command` and `args`, sets `DB_PATH` and sets or removes
+  `FORTYTWO_MCP_EXTENSIONS`. Every other env key already in the entry is kept,
+  so a hand-set remote embedder (`EMBED_PROVIDER`, `EMBED_API_KEY`,
+  `EMBED_MODEL`, `EMBED_BASE_URL`) survives `init` and `update`. `EMBED_MODEL`
+  and `OLLAMA_BASE_URL` get their defaults only when absent; `update` keeps the
+  entry's `OLLAMA_BASE_URL`, `init` writes the endpoint it resolved.
+- **A malformed `.mcp.json` is never overwritten.** `init` and `update` stop
+  with an error naming the file before installing or recording anything.
 - **Launch form.** Without extensions the entry runs
   `npx -y @justfortytwo/memory`. With extensions it runs
   `npx -y -p @justfortytwo/memory -p @justfortytwo/transcript fortytwo-memory`.
@@ -164,10 +179,14 @@ train; not yet published):
   share one npx prefix; `-p` for each package guarantees that.
 - **`update` re-wires `.mcp.json` first** (`reconcileRuntime`), before the chat
   migration, so moving chat out of memory never leaves the agent without
-  transcript search.
+  transcript search. The `doctor` results `update` prints come from a run
+  after this reconciliation, so they show the re-wired entry.
 - **`doctor`** has a warn-only `mcp extensions` check: it warns if transcript
   is installed but not listed in `FORTYTWO_MCP_EXTENSIONS` (re-run
-  `fortytwo init`), or if the variable names a package that is not installed.
+  `fortytwo init`), if the variable names a package that is not installed or
+  that the entry's `args` do not pass with `-p <package>`, or if memory is
+  installed without the declared transcript (chat is not being recorded; run
+  `fortytwo update`). `status` prints the same warnings.
   A missing extension loses its tools but memory itself still works.
 
 ### Chat migration
@@ -189,7 +208,9 @@ memory or transcript is not installed. Order:
    left off (never overwriting an existing cursor).
 
 Output reports `moved N chat row(s) from memory to the transcript` when rows
-moved.
+moved. A failed migration (a malformed legacy row, a busy database) does not
+abort `init` or `update`: it reports `chat migration skipped: <reason>`, memory
+stays intact, and the next `init` or `update` retries it.
 
 ## Oneiros installation and upgrades
 

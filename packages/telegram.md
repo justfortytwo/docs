@@ -4,7 +4,7 @@ The **Telegram channel adapter** for fortytwo — a standalone, always-on
 **bridge** connecting a Telegram bot to persistent Claude Code sessions through
 `@justfortytwo/runner`.
 
-- **Version:** `1.0.0-7` · **Runtime:** long-running bridge, `bin` is
+- **Version:** `1.0.0-8` *planned* (published: `1.0.0-7`) · **Runtime:** long-running bridge, `bin` is
   `fortytwo-telegram-bridge` · **Node:** >= 20
 
 ## Why this exists
@@ -156,7 +156,7 @@ published.
 | `TELEGRAM_BINDINGS_DB` | no | Bindings db path (default `state/telegram-bindings.db`). |
 | `DB_PATH` | no | Memory db path (default `db/fortytwo.db` relative to `FORTYTWO_ROOT`). |
 | `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Embedder handed to the conversation log (vectors are produced in the background). |
-| `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + conversation-log actor labels. |
+| `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + conversation-log actor labels. Keep `OWNER_ACTOR` at its default `owner`: Oneiros counts only inbound Telegram messages with actor `owner` as owner evidence, so another label stops persona consolidation from learning from chat. |
 | `FORTYTWO_ROOT` | no | Working root for the headless `claude` process + state files (`FORD_ROOT` is a deprecated alias). |
 
 Proxy auth for the headless `claude` session is not read here — the CLI reads

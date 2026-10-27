@@ -9,7 +9,7 @@ It is **persona-agnostic**: no chat/persona/approval coupling, just a
 generic memory store and tool surface. It can be used on its own, as a library,
 or as a Claude Code plugin.
 
-- **Version:** `1.0.0-2` · **Runtime:** MCP server over stdio, `bin` is
+- **Version:** `1.0.0-3` *planned* (published: `1.0.0-2`) · **Runtime:** MCP server over stdio, `bin` is
   `fortytwo-memory` · **Node:** >= 20
 
 [`sqlite-vec`]: https://github.com/asg017/sqlite-vec

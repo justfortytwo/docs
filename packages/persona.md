@@ -6,7 +6,7 @@ so the assistant has a name, a voice, owner facts, house rules, and a
 recallable memory corpus — plus the internal **Oneiros** consolidation
 library and prompt. It never ships an owner's real data.
 
-- **Version:** `1.0.0-2` · **Runtime:** static templates + manifest + compiled
+- **Version:** `1.0.0-3` *planned* (published: `1.0.0-2`) · **Runtime:** static templates + manifest + compiled
   Oneiros library (entry `dist/oneiros.js`)
 
 ## What's in here
