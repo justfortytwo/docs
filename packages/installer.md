@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`** — the install-time alias; with no verb it runs `init`.
 - **`fortytwo`** — the everyday lifecycle alias.
 
-- **Version:** `1.0.0-15` *planned* (published: `1.0.0-14`) · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.0.0` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -72,12 +72,12 @@ peer resolution:
 ```jsonc
 "fortytwo": {
   "compat": {
-    "@justfortytwo/memory": "1.0.0-3",
+    "@justfortytwo/memory": "1.0.0",
     "@justfortytwo/gate": "^0.1.0",
-    "@justfortytwo/persona": "1.0.0-3",
-    "@justfortytwo/telegram": "1.0.0-8",
-    "@justfortytwo/scheduler": "1.0.0-4",
-    "@justfortytwo/transcript": "^1.0.0-0"
+    "@justfortytwo/persona": "1.0.0",
+    "@justfortytwo/telegram": "1.0.0",
+    "@justfortytwo/scheduler": "1.0.0",
+    "@justfortytwo/transcript": "^1.0.0"
   }
 }
 ```
@@ -89,7 +89,7 @@ installed, with one exception: when memory is installed and a declared memory
 companion (today `@justfortytwo/transcript`) is missing, `update` installs it,
 so chat keeps being recorded. `doctor` and `status` warn (without failing) when
 memory is installed but the declared transcript is not. This compat block is
-the planned `1.0.0-15` contract. telegram and scheduler pull in
+the `1.0.0` contract. telegram and scheduler pull in
 `@justfortytwo/runner` themselves — the installer never installs runner
 directly. Pass `--no-install` to manage engine packages yourself.
 
@@ -156,8 +156,7 @@ both `.env` and the memory server's `.mcp.json` entry.
 ## MCP extensions and the transcript
 
 When `@justfortytwo/transcript` is installed, `init` and `update` wire it into
-the `fortytwo-memory` entry of `.mcp.json` (planned for the 1.0.0 prerelease
-train; not yet published):
+the `fortytwo-memory` entry of `.mcp.json`:
 
 - `FORTYTWO_MCP_EXTENSIONS=@justfortytwo/transcript` is set in the entry's
   `env`. memory reads it and loads the extension (see

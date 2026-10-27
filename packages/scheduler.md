@@ -8,7 +8,7 @@ The design rationale — durable jobs, token gating, crash safety, event hooks �
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
-- **Version:** `1.0.0-4` *planned* (published: `1.0.0-3`) · **Runtime:** standalone daemon, `bin` is
+- **Version:** `1.0.0` · **Runtime:** standalone daemon, `bin` is
   `fortytwo-scheduler` · **Node:** >= 20
 
 ## Why this exists
@@ -125,13 +125,11 @@ actor `assistant` and kind = the notification kind.
   7 days. With chat and notifications gone from memory it counts facts only,
   so it fires less often; this is accepted as is.
 
-This is planned for the 1.0.0 prerelease train; not yet published.
-
 ## Dependencies
 
-- `@justfortytwo/memory` (pinned `1.0.0-3` *planned*; the published scheduler pins `1.0.0-2`) — the `jobs` table and `JobStore`.
+- `@justfortytwo/memory` (pinned `1.0.0`) — the `jobs` table and `JobStore`.
 - `@justfortytwo/runner` — LLM turns for handlers.
-- `@justfortytwo/persona` (pinned `1.0.0-3` *planned*; the published scheduler pins `1.0.0-2`) — Oneiros `hasWork`/`refine`/
+- `@justfortytwo/persona` (pinned `1.0.0`) — Oneiros `hasWork`/`refine`/
   `workerPrompt`.
 - `@justfortytwo/telegram` — **optional peer**; enables the Telegram notifier.
 - `@justfortytwo/transcript` *(new)* — **optional peer**; receives journal

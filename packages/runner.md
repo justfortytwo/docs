@@ -6,7 +6,7 @@ tools, permissions, subagents, MCP, plugins, and memory. **Callers own**
 channels, scheduling, profiles, and persistence. The runner must not become an
 agent framework.
 
-- **Version:** `1.0.0-1` · **Runtime:** library only (no bin) · **Node:** >= 20
+- **Version:** `1.0.0` · **Runtime:** library only (no bin) · **Node:** >= 20
 - Internal design notes: `docs/runtime.md` in the runner repo
 
 ## Why this exists

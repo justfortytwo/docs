@@ -4,7 +4,7 @@ The **Telegram channel adapter** for fortytwo — a standalone, always-on
 **bridge** connecting a Telegram bot to persistent Claude Code sessions through
 `@justfortytwo/runner`.
 
-- **Version:** `1.0.0-8` *planned* (published: `1.0.0-7`) · **Runtime:** long-running bridge, `bin` is
+- **Version:** `1.0.0` · **Runtime:** long-running bridge, `bin` is
   `fortytwo-telegram-bridge` · **Node:** >= 20
 
 ## Why this exists
@@ -111,7 +111,7 @@ a memory-backed `BindingStore` — the login flow is unaffected.
 
 | Package | Used for | Contract |
 | --- | --- | --- |
-| `@justfortytwo/runner` (pinned `1.0.0-1`) | Claude process/session lifecycle | library API |
+| `@justfortytwo/runner` (pinned `1.0.0`) | Claude process/session lifecycle | library API |
 | `@justfortytwo/gate` (regular dep) | `createSourceEnvelope` provenance helper in `attachments.ts` — the *policy hook* stays optional and separately configured | `POLICY_SCHEMA_VERSION` |
 | `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the shared DB at startup; recall happens inside the headless `claude` turn via the memory MCP tools | `MEMORY_TOOL_CONTRACT_VERSION` |
 | `@justfortytwo/transcript` *(new, optional peer, loaded dynamically)* | the `ConversationLog` implementation that persists each channel event (see below) | `createTranscript` / `prepareTranscript` |
@@ -142,9 +142,6 @@ interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
   a failed `append` (sync or async) is logged and the bridge continues. A slow
   embedding can never delay a reply or stall the poll loop. Call order is
   preserved because `append` inserts synchronously.
-
-The transcript package is planned for the 1.0.0 prerelease train; not yet
-published.
 
 ## Environment
 

@@ -114,9 +114,6 @@ agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP
 - **Oneiros reads two evidence streams** (memory and transcript), each with
   its own cursor.
 
-`@justfortytwo/transcript` is planned for the 1.0.0 prerelease train and is
-not yet published.
-
 ## Canonical project locations
 
 - Website: `forty-two.it`
