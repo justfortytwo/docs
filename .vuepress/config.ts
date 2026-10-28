@@ -57,7 +57,6 @@ export default defineUserConfig({
             '/packages/telegram.md',
             '/packages/gate.md',
             '/packages/salience.md',
-            '/packages/marketplace.md',
           ],
         },
       ],

@@ -56,7 +56,6 @@ optional surrounding components:
 bootstrap / distribution / documentation:
 - installer
 - persona
-- marketplace
 - docs
 - website
 ```
@@ -75,7 +74,6 @@ bootstrap / distribution / documentation:
 | Persona and context templates | `@justfortytwo/persona` |
 | External safety/policy enforcement (optional) | `@justfortytwo/gate` |
 | Model-driven salience extraction (optional) | `@justfortytwo/salience` |
-| Plugin marketplace and umbrella plugin | `@justfortytwo/marketplace` |
 
 A useful rule when deciding where code belongs:
 

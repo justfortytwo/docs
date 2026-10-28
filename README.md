@@ -47,5 +47,3 @@ supporting components.
   enforcement layer.
 - [`@justfortytwo/salience`](./packages/salience.md) — optional model-driven
   salience extraction.
-- [`@justfortytwo/marketplace`](./packages/marketplace.md) — Claude Code plugin
-  marketplace and umbrella plugin.

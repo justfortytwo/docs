@@ -22,4 +22,3 @@ is published to npm, the prereleases remain under the `next` dist-tag and
 | [`@justfortytwo/telegram`](./telegram.md) | `1.0.0` | Telegram transport/channel adapter |
 | [`@justfortytwo/gate`](./gate.md) | `0.1.1` | Optional safety/policy enforcement |
 | [`@justfortytwo/salience`](./salience.md) | `0.1.1` | Optional model-driven salience extraction |
-| [`@justfortytwo/marketplace`](./marketplace.md) | `0.1.0` | Claude Code plugin marketplace + umbrella plugin |

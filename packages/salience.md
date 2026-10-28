@@ -86,8 +86,7 @@ turn ──> @justfortytwo/salience (extract + score) ──> Candidate[]
 ```
 
 memory references salience from `src/enrichment.ts` (the salience step).
-salience is a **pure npm engine** — not a Claude Code plugin, not in the
-marketplace catalog.
+salience is a **pure npm engine**, not a Claude Code plugin.
 
 ## Testing
 
