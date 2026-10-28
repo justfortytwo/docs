@@ -7,7 +7,7 @@ embeddings from a local Ollama model (or an opt-in remote provider).
 
 It is **persona-agnostic**: no chat/persona/approval coupling, just a
 generic memory store and tool surface. It can be used on its own, as a library,
-or as a Claude Code plugin.
+or through `@justfortytwo/installer`, which registers it in your project.
 
 - **Version:** `1.0.0` · **Runtime:** MCP server over stdio, `bin` is
   `fortytwo-memory` · **Node:** >= 20
@@ -214,9 +214,9 @@ DB_PATH=./memory.db EMBED_MODEL=qwen3-embedding:0.6b fortytwo-memory
 ```
 
 Register in any MCP host via `.mcp.json` (`command: "npx"`,
-`args: ["-y", "@justfortytwo/memory"]`). As a Claude Code plugin,
-`.claude-plugin/plugin.json` + `.mcp.json` launch it with
-`DB_PATH=${CLAUDE_PLUGIN_DATA}/memory.db`, which survives plugin updates.
+`args: ["-y", "@justfortytwo/memory"]`). It is not a Claude Code plugin: the
+installer writes this entry for you, with the transcript extension when
+`@justfortytwo/transcript` is installed.
 
 ## Testing
 
