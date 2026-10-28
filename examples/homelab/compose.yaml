@@ -1,0 +1,84 @@
+# Two containers from the SAME image (localhost/claude-code:<version>).
+# Prerequisite (external network shared with compose.chromium.yaml / ollama / waha):
+#   podman network create shared
+# Build + start:
+#   podman-compose -f compose.yaml build
+#   podman-compose -f compose.yaml up -d
+services:
+  claude-code:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: localhost/claude-code:2.1.296   # keep in sync with CLAUDE_CODE_VERSION in the Dockerfile
+    container_name: claude-code
+    hostname: claude-code
+    restart: unless-stopped
+    init: true
+    # Rootless Podman: your host UID becomes UID 1000 (user `claude`) inside the
+    # container, so ./workspace is writable from both sides. On rootful Docker,
+    # remove this and align the UIDs by hand.
+    userns_mode: "keep-id"
+    environment:
+      - TZ=Europe/Rome            # ADAPT
+      - LANG=C.utf8
+      - LC_CTYPE=C.utf8
+      - CLAUDE_CODE_DISABLE_AUTO_MEMORY=1   # memory is owned by fortytwo-memory
+    volumes:
+      # login (.credentials.json), .claude.json, settings, history: shared with `fortytwo`
+      - claude_config:/home/claude/.claude:U
+      - ./workspace:/workspace
+      # npm -g / uv tool, uv-managed Python, npm/uv caches
+      - claude_tools:/home/claude/.tools:U
+    networks:
+      - shared
+    # ttyd has NO authentication. Put it behind a reverse proxy with a LAN-only
+    # filter, or publish it on loopback only:
+    # ports:
+    #   - "127.0.0.1:7681:7681"
+    # Like the image CMD, but loads /workspace/.env and resumes the last conversation.
+    command:
+      - bash
+      - -lc
+      - |
+        set -a
+        source /workspace/.env
+        set +a
+        exec ttyd -W -O -p 7681 -t 'titleFixed=Claude Code' \
+          tmux new -A -s main 'claude -c'
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1536M
+
+  fortytwo:
+    image: localhost/claude-code:2.1.296   # same image as claude-code
+    container_name: fortytwo
+    hostname: fortytwo
+    restart: unless-stopped
+    init: true
+    userns_mode: "keep-id"
+    working_dir: /workspace
+    environment:
+      - TZ=Europe/Rome            # ADAPT
+      - LANG=C.utf8
+      - LC_CTYPE=C.utf8
+      - CLAUDE_CODE_DISABLE_AUTO_MEMORY=1
+    volumes:
+      # same volumes as claude-code: same login, same workspace, same tools
+      - claude_config:/home/claude/.claude:U
+      - ./workspace:/workspace
+      - claude_tools:/home/claude/.tools:U
+    networks:
+      - shared
+    # `fortytwo start` loads /workspace/.env itself and runs the Telegram bridge
+    # and the scheduler in the foreground; the container runtime owns restarts.
+    command: ["npx", "fortytwo", "start"]
+
+networks:
+  shared:
+    external: true   # created by hand; ADAPT the name if you use another
+
+volumes:
+  claude_config:
+  claude_tools:

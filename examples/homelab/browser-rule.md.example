@@ -1,0 +1,21 @@
+# Browser automation in this workspace
+
+Use the existing `playwright-cli` skill for command syntax. The following environment-specific instructions override its generic browser launch and shutdown examples.
+
+- The browser runs in the separate `chromium` container, with the owner's persistent profile and logins.
+- Attach with `playwright-cli attach --cdp=http://chromium:9223`, then use
+  `playwright-cli tab-list` to inspect existing tabs. Reattach after Chromium
+  restarts. The workspace `.playwright/cli.config.json` also sets this endpoint.
+- Use the attached session for subsequent commands. Do not install/download
+  browsers or launch a separate local browser as a fallback. If attachment fails,
+  report the connection failure instead.
+- Preserve the owner's existing tabs; open a task tab with `playwright-cli tab-new`
+  when appropriate. This is the same browser the owner uses in real life.
+- Finish with `playwright-cli detach`, leaving Chromium running. Do not use
+  `close`, `close-all`, `kill-all`, `delete-data`, or clear the profile as routine
+  cleanup. Close only task-created tabs when they are no longer needed.
+- Let the owner complete manual login, 2FA, or CAPTCHA.
+- Prefer `find` and targeted/depth-limited snapshots; use screenshots when visual
+  inspection is needed. Verify the result after consequential actions.
+- Existing workspace approval rules apply to browser actions too; an authenticated
+  session does not itself authorize sending, publishing, purchasing, or signing.

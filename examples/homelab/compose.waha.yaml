@@ -1,0 +1,45 @@
+# WhatsApp HTTP API (separate service). Claude uses it over MCP; fortytwo does not know about it.
+# Needs ./waha.env (see .env.waha.example).
+services:
+  waha:
+    image: docker.io/devlikeapro/waha:gows
+    container_name: waha
+    restart: unless-stopped
+    env_file:
+      - waha.env
+    environment:
+      - TZ=Europe/Rome
+      - WHATSAPP_DEFAULT_ENGINE=GOWS
+      - WAHA_APPS_ENABLED=True        # enables the "apps" (MCP) and requires Redis
+      - REDIS_URL=redis://waha-redis:6379
+      - WAHA_BASE_URL=https://YOUR-WAHA-HOST   # ADAPT
+    depends_on:
+      - waha-redis
+    volumes:
+      - waha_sessions:/app/.sessions   # WhatsApp login: SENSITIVE
+      - waha_media:/app/.media
+    networks:
+      - shared      # reachable from claude-code/fortytwo (and from the reverse proxy)
+      - internal
+    # Your reverse proxy / URL must serve https://YOUR-WAHA-HOST/mcp to Claude Code,
+    # behind a LAN-only filter.
+
+  waha-redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: waha-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--appendonly", "no"]
+    volumes:
+      - waha_redis:/data
+    networks:
+      - internal    # deliberately NOT on shared
+
+volumes:
+  waha_redis:
+  waha_sessions:
+  waha_media:
+
+networks:
+  shared:
+    external: true
+  internal:

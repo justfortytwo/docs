@@ -1,0 +1,32 @@
+# Persistent browser (LinuxServer Chromium + Selkies web desktop) reached by claude-code over CDP.
+#   podman-compose -f compose.chromium.yaml up -d
+services:
+  chromium:
+    image: lscr.io/linuxserver/chromium:latest
+    container_name: chromium
+    restart: unless-stopped
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Rome                       # ADAPT
+      - RESTART_APP=true                     # reopen Chromium if its window is closed
+      - CHROME_CLI=--remote-debugging-port=9222   # CDP, loopback inside the container only
+    volumes:
+      - ./chromium-config:/config:Z          # profile, cookies, logins: SENSITIVE DATA
+      - ./cdp.conf:/etc/nginx/conf.d/cdp.conf:ro,Z   # proxy 9223 -> 9222, rewriting the WebSocket URL
+    shm_size: "1gb"
+    deploy:
+      resources:
+        limits:
+          memory: 3G
+    networks:
+      - shared
+    # The web desktop listens on port 3000 without a password. Put it behind a
+    # reverse proxy with a LAN-only filter, or publish it on loopback only:
+    # ports:
+    #   - "127.0.0.1:3000:3000"
+    # NEVER publish or route 9223: it gives full browser control with no authentication.
+
+networks:
+  shared:
+    external: true

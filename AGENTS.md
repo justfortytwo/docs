@@ -20,6 +20,10 @@ README.md      Repo intro + Index of design docs (keep in sync when adding docs)
 architecture.md  Cross-repository system overview (ownership map, principles)
 scheduler.md   Scheduler & Durable Jobs design (jobs table, JobStore, tick,
                token-gating, event hooks, crash-safety, MVP scope)
+homelab.md     Deployment guide: always-on setup in containers (cross-package)
+examples/      Companion files for guides (examples/homelab: compose files,
+               Dockerfile, .env/.mcp.json examples). Not Markdown, so not
+               published as pages; guides link to them on GitHub
 packages/      One reference page per @justfortytwo/* package
 .vuepress/     VuePress site config (config.ts)
 package.json   Site toolchain (vuepress 2.0.0-rc.31, vite bundler, default theme)

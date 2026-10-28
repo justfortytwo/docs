@@ -1,0 +1,29 @@
+# Local embeddings for fortytwo-memory and the transcript.
+services:
+  ollama:
+    image: docker.io/ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    networks:
+      - shared
+    environment:
+      - TZ=Europe/Rome
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_KEEP_ALIVE=24h
+    # the entrypoint starts the server and runs `ollama pull` for the embedding model (idempotent)
+    entrypoint: ["/usr/bin/env", "sh", "/entrypoint.sh"]
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./ollama-entrypoint.sh:/entrypoint.sh:ro,Z
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'     # ADAPT
+          memory: 4096M   # ADAPT
+
+networks:
+  shared:
+    external: true
+
+volumes:
+  ollama_data:

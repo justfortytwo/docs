@@ -35,6 +35,7 @@ export default defineUserConfig({
       { text: 'Architecture', link: '/architecture.html' },
       { text: 'Packages', link: '/packages/' },
       { text: 'Design', link: '/scheduler.html' },
+      { text: 'Homelab', link: '/homelab.html' },
       { text: 'forty-two.it', link: 'https://forty-two.it/' },
     ],
 
@@ -50,6 +51,7 @@ export default defineUserConfig({
             '/packages/installer.md',
             '/packages/persona.md',
             '/packages/memory.md',
+            '/packages/transcript.md',
             '/packages/runner.md',
             '/packages/scheduler.md',
             '/packages/telegram.md',
@@ -67,6 +69,10 @@ export default defineUserConfig({
         {
           text: 'Design',
           children: ['/scheduler.md'],
+        },
+        {
+          text: 'Guides',
+          children: ['/homelab.md'],
         },
       ],
     },

@@ -22,6 +22,10 @@ supporting components.
 - [Scheduler & Durable Jobs](./scheduler.md) — the decoupled, token-gated job
   scheduler (the spine's *durable jobs* + *Pulse*): one `jobs` table drained by
   a standalone daemon, an LLM turn only behind a cheap "is there work?" gate.
+- [Running fortytwo on a homelab](./homelab.md) — a deployment guide for an
+  always-on setup in containers: Telegram, scheduler, memory with local
+  embeddings, the transcript, and how to update. Compose files and
+  configuration examples live in [`examples/homelab/`](https://github.com/justfortytwo/docs/tree/main/examples/homelab).
 
 ### Package reference
 
