@@ -31,6 +31,23 @@ lifecycle entirely to runner — it makes no provider or model decisions.
 3. **Scheduler separation.** Proactive wakes remain the responsibility of the
    external `@justfortytwo/scheduler` daemon.
 
+### Attachments
+
+Inbound messages can carry attachments: **photos** (`telegram_photo`),
+**documents** (`telegram_document`), **voice notes** (`telegram_voice`) and
+**audio files** (`telegram_audio`). Each is downloaded within the byte limit,
+stored under the inbox store dir as `<chat>/<message>` with the extension
+derived from the real mime type, and handed to the session as an
+untrusted-content attachment with a gate provenance envelope. Telegram never
+sends a file name for voice notes, and none is invented: when the update
+carries no `file_name`, the stored name comes from the message and file ids,
+as with the other attachment kinds. Files over the download limit are skipped
+and reported.
+
+Limitation: the agent receives the stored file path only — nothing transcribes
+audio yet. Transcription, video and video-note ingestion, and richer handling
+of oversized files are tracked separately.
+
 ### Typing indicator lifecycle
 
 Each chat owns one typing refresher while Claude works. Sending a message
@@ -197,4 +214,5 @@ owned by `@justfortytwo/transcript`).
 
 **Out of scope:** agent execution (Claude Code), process lifecycle (runner),
 proactive wakes (scheduler), durable tool authorization (Claude Code
-permissions), policy enforcement (gate, optional).
+permissions), policy enforcement (gate, optional), transcription of audio
+attachments and video / video-note ingestion (tracked separately).
