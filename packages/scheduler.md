@@ -96,7 +96,9 @@ supervises it together with the Telegram bridge.
 | `CLAUDE_BIN` | no | `claude` CLI path the runner spawns (default: `claude` on `PATH`) |
 | `FORTYTWO_TURN_TIMEOUT` | no | per-turn timeout in seconds (default `300`) |
 | `TELEGRAM_BOT_TOKEN` | optional | enables Telegram push notifications |
-| `ALLOWED_CHAT_IDS` | optional | comma-separated chat IDs to push to |
+| `ALLOWED_CHAT_IDS` | optional | comma-separated chat IDs; when set, push goes to the first id. When unset, push goes to every chat paired with `fortytwo pair` |
+| `FORTYTWO_ROOT` | no | project root used to find the Telegram bindings db (default: working directory) |
+| `TELEGRAM_BINDINGS_DB` | no | bindings db path relative to the root (default `state/telegram-bindings.db`); must match the bridge |
 
 ### Liveness
 
