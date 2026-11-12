@@ -50,14 +50,43 @@ cheap check that runs **before** an LLM turn is spent.
 
 | kind | schedule | gate | behavior |
 |------|----------|------|----------|
-| `daily_briefing` | `57 7 * * *` UTC | none | runs the daily-briefing skill and sends the rundown |
+| `daily_briefing` | `57 7 * * *` UTC | none | runs the `daily-briefing` skill and sends the rundown |
 | `sweep` | `3 13,18 * * *` | pending approvals > 0 | open-thread sweep, one-line status |
-| `learn_review` | `17 9 * * 0` | recent memory rows (7 d) > 0; counts facts only, since chat and notifications moved to the transcript | propose-only pattern promotion from recent memory |
+| `learn_review` | `17 9 * * 0` | recent memory rows (7 d) > 0; counts facts only, since chat and notifications moved to the transcript | runs the `learn-review` skill: propose-only rules, candidate skills and memory cleanups from the last 7 days |
 | `notify_pending` | one-off | none | notify about pending items |
 | `reply` | one-off | none | send a reply via the runner |
 | `reminder` | one-off | none | send a reminder via the runner |
 | `reembed_memory` | maintenance | none | re-embeds one memory by id in-place (**no LLM**, no notification) |
 | `persona.oneiros` | `17 3 * * *` UTC | memory-head or transcript-head check | persona maintenance (below) |
+
+### Choosing the built-in schedules
+
+`daily_briefing`, `sweep` and `learn_review` can be switched on or off per
+install. `fortytwo init` asks about each one (or takes
+`--schedules all|none|<kind,kind>`) and writes
+`<FORTYTWO_ROOT>/.fortytwo/schedules.json`:
+
+```json
+{ "version": 1, "schedules": { "daily_briefing": { "enabled": false } } }
+```
+
+The daemon reads it once at boot. A job that is off is not seeded and its
+existing row is retired; switching it back on seeds it again. A kind that is not
+listed is on, and so is every kind when the file is missing, so installs that
+predate the file are unchanged. A file that cannot be parsed stops the daemon
+with an error instead of running everything. Restart Fortytwo after a change.
+
+### Skills behind the schedules
+
+`daily_briefing` and `learn_review` each name a Claude Code skill. The skills
+ship in `@justfortytwo/persona`, and the installer copies them into
+`<FORTYTWO_ROOT>/.claude/skills/` on `init` and on every `update`.
+
+On every run the job checks for `<name>/SKILL.md` in that directory and in
+`$CLAUDE_CONFIG_DIR/skills` (default `~/.claude/skills`). With the skill it
+sends a short "run the skill" prompt. Without it, it sends a self-contained
+prompt that states the task and its limits, so a scheduler running without the
+installer still produces a sensible result.
 
 ## Oneiros maintenance
 
@@ -97,7 +126,8 @@ supervises it together with the Telegram bridge.
 | `FORTYTWO_TURN_TIMEOUT` | no | per-turn timeout in seconds (default `300`) |
 | `TELEGRAM_BOT_TOKEN` | optional | enables Telegram push notifications |
 | `ALLOWED_CHAT_IDS` | optional | comma-separated chat IDs; when set, push goes to the first id. When unset, push goes to every chat paired with `fortytwo pair` |
-| `FORTYTWO_ROOT` | no | project root used to find the Telegram bindings db (default: working directory) |
+| `FORTYTWO_ROOT` | no | project root: holds `.fortytwo/schedules.json`, `.claude/skills` and the Telegram bindings db (default: working directory) |
+| `CLAUDE_CONFIG_DIR` | no | Claude Code config dir, checked for user-level skills (default `~/.claude`) |
 | `TELEGRAM_BINDINGS_DB` | no | bindings db path relative to the root (default `state/telegram-bindings.db`); must match the bridge |
 
 ### Liveness

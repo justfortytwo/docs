@@ -63,6 +63,11 @@ template token — they stay in the gitignored identity file.
 
 `manifest.json` carries `version`, `manifestVersion`, `description`, plus:
 
+- **`skills`** — the Claude Code skills the scheduler's built-in jobs call
+  (`daily-briefing`, `learn-review`), shipped under `skills/` without
+  placeholders. The installer copies them into the project's `.claude/skills/`
+  on `init` and on every `update`, overwriting only its own earlier copy.
+  Personal adjustments belong in `context/rules/APPROVED.md`.
 - **`files`** — template → output → render mode:
   - **`managed`** — re-rendered on every `init` (`CLAUDE.md`, the `INDEX.md`
     files); not meant for hand-editing.
