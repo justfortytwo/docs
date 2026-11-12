@@ -169,6 +169,20 @@ Your message should appear as `telegram | inbound | owner` and the reply as
 `outbound | assistant`. In a Claude session, the agent searches it with
 `transcript_search` and reads neighbours with `transcript_context`.
 
+## Built-in schedules
+
+The scheduler ships three recurring jobs: a daily briefing, an open-thread
+sweep and a weekly learn-review. `init` asks which ones to run. To see or
+change the choice later:
+
+```bash
+podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo schedules'
+podman restart fortytwo        # the scheduler reads the choice at start
+```
+
+Do not re-run `init` for this on a working install: it asks for your identity
+again. `fortytwo schedules` touches only `.fortytwo/schedules.json`.
+
 ## Updating
 
 Always stop the runtime first: `update` refuses to run against live services.

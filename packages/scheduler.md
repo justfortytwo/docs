@@ -74,7 +74,8 @@ The daemon reads it once at boot. A job that is off is not seeded and its
 existing row is retired; switching it back on seeds it again. A kind that is not
 listed is on, and so is every kind when the file is missing, so installs that
 predate the file are unchanged. A file that cannot be parsed stops the daemon
-with an error instead of running everything. Restart Fortytwo after a change.
+with an error instead of running everything. Restart Fortytwo after a change. On an existing install, change the choice with
+`fortytwo schedules` (it touches only this file).
 
 ### Skills behind the schedules
 

@@ -62,6 +62,7 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `enrich` | Capture more answers to deepen the persona, then re-render (no clobber). |
 | `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until` — previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
 | `unbind` | Revoke a channel binding (un-pair a chat / drop it from the allowlist). |
+| `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
 
 ## Versioning and compatibility
 
