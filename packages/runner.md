@@ -109,6 +109,13 @@ caller must keep its own process alive and close sessions during shutdown.
   defaults.
 - `timeoutMs` — optional one-shot wall-clock limit.
 
+`claudeArgsFromEnv(env?)` reads operator-supplied Claude arguments from
+`FORTYTWO_CLAUDE_ARGS` (a JSON array of strings such as `["--chrome"]`) and
+returns them validated, throwing a `TypeError` that names the variable
+otherwise. `createRunner` never reads the variable itself: a caller passes the
+result as `args` where operator arguments should apply (the Telegram bridge and
+the scheduler daemon do) and leaves it out for locked-down runs.
+
 Per-call arguments **append** to defaults; environment overlays copy onto the
 parent environment (defaults first, per-call last); caller objects are never
 mutated. The runner owns the format flags (`-p --input-format stream-json

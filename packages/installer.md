@@ -113,6 +113,22 @@ directory containing `.fortytwo/` and runs that project's own pinned
 CLI, so code another user plants in a shared directory is never run. It never
 replaces a `fortytwo` it did not write.
 
+## Passing arguments to Claude Code
+
+Everything after `--` on `fortytwo start` is handed to Claude Code on every chat
+and scheduled run:
+
+```sh
+fortytwo start -- --chrome
+```
+
+The arguments travel to the services as `FORTYTWO_CLAUDE_ARGS`, a JSON array of
+strings. To make them permanent, set that variable in `.env` instead
+(`FORTYTWO_CLAUDE_ARGS=["--chrome"]`); the command line wins over it, and a bare
+`--` passes none. `--input-format` and `--output-format` are refused, because
+fortytwo sets them itself. The memory-consolidation worker (Oneiros) runs locked
+down and never receives these arguments.
+
 ## Running as a service
 
 `fortytwo start` stays in the foreground on purpose, so the thing that runs it

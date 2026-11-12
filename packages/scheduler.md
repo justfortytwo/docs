@@ -124,6 +124,7 @@ supervises it together with the Telegram bridge.
 | `EMBED_MODEL` | recommended | Ollama embedding model (falls back to FakeEmbedder) |
 | `OLLAMA_BASE_URL` | no | default `http://localhost:11434` |
 | `CLAUDE_BIN` | no | `claude` CLI path the runner spawns (default: `claude` on `PATH`) |
+| `FORTYTWO_CLAUDE_ARGS` | no | Extra arguments for every `claude` run, as a JSON array of strings (e.g. `["--chrome"]`). Set by `fortytwo start -- <args>`. Applies to scheduled runs, not to the Oneiros worker. A malformed value stops the daemon at boot. |
 | `FORTYTWO_TURN_TIMEOUT` | no | per-turn timeout in seconds (default `300`) |
 | `TELEGRAM_BOT_TOKEN` | optional | enables Telegram push notifications |
 | `ALLOWED_CHAT_IDS` | optional | comma-separated chat IDs; when set, push goes to the first id. When unset, push goes to every chat paired with `fortytwo pair` |
