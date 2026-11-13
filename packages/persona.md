@@ -6,7 +6,7 @@ so the assistant has a name, a voice, owner facts, house rules, and a
 recallable memory corpus — plus the internal **Oneiros** consolidation
 library and prompt. It never ships an owner's real data.
 
-- **Version:** `1.0.0` · **Runtime:** static templates + manifest + compiled
+- **Version:** `1.0.2` · **Runtime:** static templates + manifest + compiled
   Oneiros library (entry `dist/oneiros.js`)
 
 ## What's in here
@@ -105,7 +105,7 @@ the memory corpus and the conversation transcript. Each stream has its own curso
 own state files:
 
 - **Ownership:** the scheduler owns the daily `persona.oneiros` job
-  (`17 3 * * *` UTC); runner executes a separate tool-free session
+  (`17 3 * * *`, UTC unless the scheduler time zone is set); runner executes a separate tool-free session
   (`--safe-mode`, no tools/MCP/skills/session persistence); persona exports
   `initialize(root, head, stream?)`, `hasWork(root, memory, transcript?)` and
   `refine({ root, memory, transcript?, worker })`. The `transcript` source is

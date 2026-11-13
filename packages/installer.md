@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`** — the install-time alias; with no verb it runs `init`.
 - **`fortytwo`** — the everyday lifecycle alias.
 
-- **Version:** `1.0.0` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.0.7` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -74,11 +74,11 @@ peer resolution:
 ```jsonc
 "fortytwo": {
   "compat": {
-    "@justfortytwo/memory": "1.0.0",
+    "@justfortytwo/memory": "1.0.1",
     "@justfortytwo/gate": "^1.0.0",
-    "@justfortytwo/persona": "1.0.0",
-    "@justfortytwo/telegram": "1.0.0",
-    "@justfortytwo/scheduler": "1.0.0",
+    "@justfortytwo/persona": "1.0.2",
+    "@justfortytwo/telegram": "1.0.3",
+    "@justfortytwo/scheduler": "1.0.5",
     "@justfortytwo/transcript": "^1.0.0"
   }
 }
@@ -91,7 +91,7 @@ installed, with one exception: when memory is installed and a declared memory
 companion (today `@justfortytwo/transcript`) is missing, `update` installs it,
 so chat keeps being recorded. `doctor` and `status` warn (without failing) when
 memory is installed but the declared transcript is not. This compat block is
-the `1.0.0` contract. telegram and scheduler pull in
+the `1.0` contract. telegram and scheduler pull in
 `@justfortytwo/runner` themselves — the installer never installs runner
 directly. Pass `--no-install` to manage engine packages yourself.
 

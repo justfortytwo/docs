@@ -9,7 +9,7 @@ It is **persona-agnostic**: no chat/persona/approval coupling, just a
 generic memory store and tool surface. It can be used on its own, as a library,
 or through `@justfortytwo/installer`, which registers it in your project.
 
-- **Version:** `1.0.0` · **Runtime:** MCP server over stdio, `bin` is
+- **Version:** `1.0.1` (widens the optional gate peer to `^0.1.0 || ^1.0.0`; no other change) · **Runtime:** MCP server over stdio, `bin` is
   `fortytwo-memory` · **Node:** >= 20
 
 [`sqlite-vec`]: https://github.com/asg017/sqlite-vec
