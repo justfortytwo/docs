@@ -3,13 +3,14 @@
 This is the design for fortytwo's **scheduler** — the subsystem that runs work on
 a clock and on demand without a human in the loop. It implements two spine items
 from [Design Principles](./design-principles.md): **durable jobs** and **Pulse**
-(proactive wakes). It is a decoupled successor to the proactive-wake loop that
-currently lives inside the Telegram bridge.
+(proactive wakes). It replaced the proactive-wake loop that used to live inside
+the Telegram bridge. This is the design record; the shipped behavior of the
+package is in [`packages/scheduler.md`](./packages/scheduler.md).
 
 ## Why this exists
 
-Today the proactive-wake scheduler is embedded in the Telegram bridge
-(`schedulerLoop` + a hard-coded `SCHEDULES` array). Two problems:
+Before the scheduler, the proactive-wake scheduler was embedded in the Telegram bridge
+(`schedulerLoop` + a hard-coded `SCHEDULES` array). It had two problems:
 
 1. **Coupled to one channel.** No bridge running ⇒ no wakes. The assistant
    cannot do anything proactively unless Telegram is up.
@@ -17,8 +18,8 @@ Today the proactive-wake scheduler is embedded in the Telegram bridge
    unconditionally — the afternoon "open-thread sweep" runs even when there are
    zero pending approvals and nothing to report. That is pure waste.
 
-And there is no durable **one-off** job queue at all: the deferred-jobs runner
-was never extracted, there is no `jobs` table, and the bridge's `jobLoop` is a
+And there was no durable **one-off** job queue at all: the deferred-jobs runner
+was never extracted, there was no `jobs` table, and the bridge's `jobLoop` was a
 stub.
 
 The goal: a **channel-agnostic, token-frugal, durable** scheduler that fires the
@@ -146,16 +147,51 @@ assistant has that turn.
 
 ## Control flow
 
-1. **Boot.** Seed the built-in recurring jobs (briefing, sweeps, learn-review),
-   keyed by `kind` (one row per built-in). The code definition is **authoritative
-   for built-ins**: on boot, if a built-in's cron string changed in code, its
-   row's `recurrence`/`run_at` are updated. User-defined jobs are
-   DB-authoritative and never overwritten from code.
+1. **Boot.** Read the owner's choice (see [Owner-selectable
+   built-ins](#owner-selectable-built-ins)). Retire the recurring rows of
+   disabled kinds, then seed the enabled built-ins (briefing, sweep,
+   learn-review, Oneiros), keyed by `kind` (one active recurring row per
+   built-in). The code definition is **authoritative for built-ins**: if a
+   built-in's cron string changed in code, its row's `recurrence`/`run_at` are
+   updated. User-defined jobs are DB-authoritative and never overwritten from
+   code. Finally, realign recurring rows to the configured time zone.
 2. **Loop.** Every ~30s (and via croner for precise recurrence), call
    `tick(now)`: `claimDue` → per job, gate → *skip + reschedule* or *run on the
    p-queue* → notify + reschedule.
 3. **Reschedule.** After a recurring job runs (or is skipped), the next `run_at`
    is computed from `recurrence` and written back.
+
+## Owner-selectable built-ins
+
+The built-in recurring jobs are the assistant's defaults, not a mandate: the
+owner decides which run and in which time zone. The choice is a small file,
+`<FORTYTWO_ROOT>/.fortytwo/schedules.json`, **owned by the scheduler** (the
+installer only asks and writes it):
+
+```json
+{ "version": 1, "timezone": "Europe/Rome",
+  "schedules": { "daily_briefing": { "enabled": false } } }
+```
+
+- A kind not listed is **on**; a missing file means every built-in is on, so
+  installs that predate the file are unchanged. Unknown kinds are ignored.
+- The file is **read once at boot**; changes apply after a restart.
+- A disabled kind has its active recurring row **retired** (`complete`, no
+  reschedule, status `done`). One-off rows of the same kind are untouched.
+  Re-enabling inserts a **fresh** row at the next boot; the old `done` row
+  stays.
+- `timezone` (optional IANA name, absent = UTC) is the clock the built-in times
+  and the Oneiros job are read in, across daylight saving. A zone change applies
+  at boot by moving a recurring row only if it is `pending`, in the future and
+  has made no attempt; overdue rows still run, running rows finish, retry
+  backoffs keep their time.
+- **Fail closed.** A file that exists but cannot be understood (bad JSON, a
+  non-boolean `enabled`, an unusable `timezone`) stops the daemon with an error.
+  It never falls back to "everything on" or to UTC. This was an explicit owner
+  decision: a silent fallback would send briefings the owner switched off, or at
+  the wrong hour.
+
+Only on/off and the zone are configurable; custom per-job times are not.
 
 ## Token-gating — the core guarantee
 
@@ -242,3 +278,14 @@ durable one-off, closing an existing stub) with its enqueue point in memory's
 store path; `notify_pending` and `reply` reactive jobs; the `reminder` one-off.
 **Deferred:** external channel adapters (`triage`), richer retry/backoff policy,
 and a `fortytwo` CLI surface for inspecting/managing the queue.
+
+**Since the MVP:** owner-selectable built-ins and a time zone (above); output
+goes to the conversation log in `@justfortytwo/transcript` rather than to a
+memory journal.
+
+**Open:**
+
+- The `sweep` gate counts memory's `approvals` table, not the gate's approval
+  file, so it does not see actions held by the gate hook.
+- The assistant has no tool to create reminder or other one-off jobs itself.
+- Per-job custom times are not configurable.

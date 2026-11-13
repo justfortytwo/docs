@@ -8,7 +8,7 @@ The design rationale — durable jobs, token gating, crash safety, event hooks �
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
-- **Version:** `1.0.0` · **Runtime:** standalone daemon, `bin` is
+- **Version:** `1.0.6` · **Runtime:** standalone daemon, `bin` is
   `fortytwo-scheduler` · **Node:** >= 20
 
 ## Why this exists
@@ -50,14 +50,14 @@ cheap check that runs **before** an LLM turn is spent.
 
 | kind | schedule | gate | behavior |
 |------|----------|------|----------|
-| `daily_briefing` | `57 7 * * *` UTC | none | runs the `daily-briefing` skill and sends the rundown |
-| `sweep` | `3 13,18 * * *` | pending approvals > 0 | open-thread sweep, one-line status |
+| `daily_briefing` | `57 7 * * *` (07:57) | none | runs the `daily-briefing` skill and sends the rundown |
+| `sweep` | `3 13,18 * * *` | pending rows in memory's `approvals` table > 0 (not the gate's approval file) | open-thread sweep, one-line status |
 | `learn_review` | `17 9 * * 0` | recent memory rows (7 d) > 0; counts facts only, since chat and notifications moved to the transcript | runs the `learn-review` skill: propose-only rules, candidate skills and memory cleanups from the last 7 days |
 | `notify_pending` | one-off | none | notify about pending items |
 | `reply` | one-off | none | send a reply via the runner |
 | `reminder` | one-off | none | send a reminder via the runner |
 | `reembed_memory` | maintenance | none | re-embeds one memory by id in-place (**no LLM**, no notification) |
-| `persona.oneiros` | `17 3 * * *` UTC | memory-head or transcript-head check | persona maintenance (below) |
+| `persona.oneiros` | `17 3 * * *` (03:17) | memory-head or transcript-head check | persona maintenance (below) |
 
 ### Choosing the built-in schedules
 
@@ -67,15 +67,34 @@ install. `fortytwo init` asks about each one (or takes
 `<FORTYTWO_ROOT>/.fortytwo/schedules.json`:
 
 ```json
-{ "version": 1, "schedules": { "daily_briefing": { "enabled": false } } }
+{ "version": 1, "timezone": "Europe/Rome", "schedules": { "daily_briefing": { "enabled": false } } }
 ```
 
-The daemon reads it once at boot. A job that is off is not seeded and its
-existing row is retired; switching it back on seeds it again. A kind that is not
+`schedules.<kind>.enabled` must be a boolean. `timezone` is optional.
+
+The daemon reads it once at boot. A job that is off has its active recurring
+row retired (status `done`, not rescheduled; one-off rows of the same kind are
+untouched). Switching it back on inserts a **fresh** row at the next boot; the
+old `done` row stays in the table. A kind that is not
 listed is on, and so is every kind when the file is missing, so installs that
-predate the file are unchanged. A file that cannot be parsed stops the daemon
-with an error instead of running everything. Restart Fortytwo after a change. On an existing install, change the choice with
-`fortytwo schedules` (it touches only this file).
+predate the file are unchanged. A file that exists but cannot be understood (bad JSON, a
+non-boolean `enabled`, an unusable `timezone`) stops the daemon with an error;
+it never falls back to "everything on" or to UTC. Restart Fortytwo after a
+change. On an existing install, change the choice with `fortytwo schedules` (it
+touches only this file).
+
+### Time zone
+
+Since scheduler 1.0.6, `timezone` (an IANA name) is the clock the built-in
+times **and** the Oneiros job are read in, across daylight saving. Absent means
+UTC. At boot `realignRecurring` moves a recurring row to its next correct run
+only if it is `pending`, in the future and has `attempts = 0`; overdue rows
+still run (catch-up), running rows finish and retry backoffs keep their time.
+That is how a zone change applies after a restart. Setting the zone from the
+CLI (`fortytwo schedules --timezone <name|utc>`) arrives with installer 1.0.8;
+until that is published, edit the file.
+
+Only on/off and the zone are configurable: per-job custom times are not.
 
 ### Skills behind the schedules
 
@@ -91,7 +110,7 @@ installer still produces a sensible result.
 
 ## Oneiros maintenance
 
-`persona.oneiros` runs daily at `17 3 * * *` UTC with null payload and the
+`persona.oneiros` runs daily at `17 3 * * *` (in the configured time zone, UTC by default) with null payload and the
 existing durable retry/claim mechanism. The installer seeds it after
 initializing persona's checkpoint; daemon boot reconciles the same job when
 the checkpoint exists. The cheap gate checks both evidence heads: the memory
@@ -161,9 +180,9 @@ actor `assistant` and kind = the notification kind.
 
 ## Dependencies
 
-- `@justfortytwo/memory` (pinned `1.0.0`) — the `jobs` table and `JobStore`.
+- `@justfortytwo/memory` (pinned `1.0.1`) — the `jobs` table and `JobStore`.
 - `@justfortytwo/runner` — LLM turns for handlers.
-- `@justfortytwo/persona` (pinned `1.0.0`) — Oneiros `hasWork`/`refine`/
+- `@justfortytwo/persona` (pinned `1.0.2`) — Oneiros `hasWork`/`refine`/
   `workerPrompt`.
 - `@justfortytwo/telegram` — **optional peer**; enables the Telegram notifier.
 - `@justfortytwo/transcript` *(new)* — **optional peer**; receives journal

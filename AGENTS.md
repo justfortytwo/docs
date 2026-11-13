@@ -66,13 +66,19 @@ checking relative links — the build warns about broken links.
   recurrence math are pure DB/JS; an LLM turn runs only after a cheap
   `hasWork` gate passes.
 - Durable state lives in `@justfortytwo/memory` (a `jobs` table, migration
-  `004_jobs`, and a DI'd `JobStore`), next to the journal and registry.
+  `004_jobs`, and a DI'd `JobStore`), next to the approvals table and durable
+  memories. Chat and scheduler notifications are not in memory: they live in
+  `@justfortytwo/transcript`.
 - `@justfortytwo/scheduler` is a standalone daemon (croner + ~30s `claimDue`
   poll + p-queue concurrency 1 + handler registry keyed by `kind`).
 - `@justfortytwo/runner` wraps headless `claude -p --output-format json`;
   scheduler and telegram both depend on it, not on each other.
-- Output is channel-agnostic: always written to the memory journal; Telegram is
-  an optional notifier.
+- Output is channel-agnostic: written to the conversation log in
+  `@justfortytwo/transcript` (a no-op when transcript is not installed);
+  Telegram is an optional notifier.
+- Built-in schedules are owner-selectable (`.fortytwo/schedules.json`: per-kind
+  `enabled` plus an optional IANA `timezone`, read once at boot; an unreadable
+  file stops the daemon).
 - Producers only insert `pending` rows; the daemon is the single writer of the
   `running` transition (SQLite in WAL mode). Reactive jobs are de-duplicated
   at the enqueue site.
@@ -82,9 +88,10 @@ checking relative links — the build warns about broken links.
 - `scheduler.md` links to `./design-principles.md`, which **does not exist**
   in this repo yet. Don't assume it does; create it or fix the link only if
   asked.
-- `scheduler.md` describes `scheduler` and `runner` as *(new)* and talks about
-  the bridge's `schedulerLoop`/`SCHEDULES` in the present tense. Sibling repos
-  `../scheduler` and `../runner` now exist, so the doc may lag the code. When
+- `scheduler.md` is a design record: it still labels `scheduler` and `runner`
+  *(new)* and describes the bridge's old `schedulerLoop`/`SCHEDULES`. Shipped
+  behavior is in `packages/scheduler.md`; `../scheduler` and `../runner` are
+  the source of truth. When
   documenting current behavior, verify against the sibling package source
   rather than trusting this doc; when editing, keep it framed as a design doc.
 - Don't move package install/config instructions here — they belong in each
