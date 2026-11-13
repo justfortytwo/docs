@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`** — the install-time alias; with no verb it runs `init`.
 - **`fortytwo`** — the everyday lifecycle alias.
 
-- **Version:** `1.0.7` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.0.8` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -54,7 +54,7 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `start` | Run fortytwo in the foreground: load the project `.env` (process env wins over it), start every installed and configured service, prefix and forward their logs, stop them all on Ctrl+C/SIGTERM. Never daemonizes or restarts — the surrounding service manager owns that. |
 | `status` | Show whether fortytwo, the Telegram bridge and the scheduler are running, and whether memory is configured. Exits 0 when running, 3 when not (usable as a health check). |
 | `stop` | Stop this project's `fortytwo start`. Signals only the process recorded in `.fortytwo/runtime.json`, and only while its heartbeat is fresh **and** its OS process-start identity matches; never looks for processes by name. |
-| `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, copy the skills the built-in schedules call into `.claude/skills/`, ask which built-in schedules to run (`--schedules all|none|<kind,kind>` when non-interactive; stored in `.fortytwo/schedules.json`), provision local infra (embedder model, memory DB migration), record the installed version set. |
+| `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, copy the skills the built-in schedules call into `.claude/skills/`, ask which built-in schedules to run (`--schedules all|none|<kind,kind>` when non-interactive; stored in `.fortytwo/schedules.json`) and save the owner's time zone when none is saved and it is not UTC (`update` never touches it), provision local infra (embedder model, memory DB migration), record the installed version set. |
 | `pair` | Issue a one-time `/login` pairing code, persisted to the bridge's bindings db (dynamic counterpart of the static `ALLOWED_CHAT_IDS` allowlist). Refuses when Telegram isn't running, unless `--force`. |
 | `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), and whether the optional safety gate is on. |
 | `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline, refresh the shipped skills in `.claude/skills/` (a same-named skill you wrote yourself is left alone), then run `doctor`. `--dry-run` reports without installing. |
@@ -63,7 +63,7 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until` — previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
 | `unbind` | Revoke a channel binding (un-pair a chat / drop it from the allowlist). |
 | `gate` | Show or change the optional safety gate: `gate on` holds outward and destructive actions for approval, `gate off` removes it. Off by default; restart Fortytwo to apply. See [The safety gate](#the-safety-gate-optional). |
-| `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
+| `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking; `--timezone <IANA name\|utc>` sets the zone the built-in times (and Oneiros) are read in, and `--list` prints it ("Times are in <zone>"). In a terminal it also asks for the zone; a name that is not a time zone exits 2 and saves nothing. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
 
 ## Versioning and compatibility
 
@@ -78,7 +78,7 @@ peer resolution:
     "@justfortytwo/gate": "^1.0.0",
     "@justfortytwo/persona": "1.0.2",
     "@justfortytwo/telegram": "1.0.3",
-    "@justfortytwo/scheduler": "1.0.5",
+    "@justfortytwo/scheduler": "1.0.6",
     "@justfortytwo/transcript": "^1.0.0"
   }
 }

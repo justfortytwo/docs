@@ -90,9 +90,9 @@ times **and** the Oneiros job are read in, across daylight saving. Absent means
 UTC. At boot `realignRecurring` moves a recurring row to its next correct run
 only if it is `pending`, in the future and has `attempts = 0`; overdue rows
 still run (catch-up), running rows finish and retry backoffs keep their time.
-That is how a zone change applies after a restart. Setting the zone from the
-CLI (`fortytwo schedules --timezone <name|utc>`) arrives with installer 1.0.8;
-until that is published, edit the file.
+That is how a zone change applies after a restart. Set the zone with
+`fortytwo schedules --timezone <name|utc>` (installer 1.0.8); the daemon logs
+`[scheduler] built-in schedules in <zone>` at start.
 
 Only on/off and the zone are configurable: per-job custom times are not.
 

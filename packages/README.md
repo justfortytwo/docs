@@ -12,7 +12,7 @@ the current releases on npm.
 
 | Package | Version | Role |
 |---------|---------|------|
-| [`@justfortytwo/installer`](./installer.md) | `1.0.7` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
+| [`@justfortytwo/installer`](./installer.md) | `1.0.8` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
 | [`@justfortytwo/persona`](./persona.md) | `1.0.2` | Persona and context templates + Oneiros |
 | [`@justfortytwo/memory`](./memory.md) | `1.0.1` | Durable semantic-memory MCP server |
 | [`@justfortytwo/transcript`](./transcript.md) *(new)* | `1.0.0` | Searchable conversation log, separate from memory |

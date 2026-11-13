@@ -183,6 +183,18 @@ podman restart fortytwo        # the scheduler reads the choice at start
 Do not re-run `init` for this on a working install: it asks for your identity
 again. `fortytwo schedules` touches only `.fortytwo/schedules.json`.
 
+Built-in times are read in UTC unless you set a time zone (briefing 07:57,
+sweep 13:03 and 18:03, learn-review Sundays 09:17, Oneiros 03:17):
+
+```bash
+podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo schedules --timezone Europe/Rome'
+podman restart fortytwo
+```
+
+`--timezone` takes an IANA name or `utc`; a name that is not a time zone exits 2
+and saves nothing. The zone covers daylight saving, and waiting runs move to the
+new time at the next start.
+
 ## Safety gate (optional)
 
 Off by default. To have outward and destructive actions wait for your approval
