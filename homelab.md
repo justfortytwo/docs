@@ -183,6 +183,24 @@ podman restart fortytwo        # the scheduler reads the choice at start
 Do not re-run `init` for this on a working install: it asks for your identity
 again. `fortytwo schedules` touches only `.fortytwo/schedules.json`.
 
+## Safety gate (optional)
+
+Off by default. To have outward and destructive actions wait for your approval
+in Telegram:
+
+```bash
+podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo gate on'
+podman restart fortytwo
+```
+
+A held action then shows up in the paired chat with Approve / Deny buttons.
+`npx fortytwo gate` shows the state and `npx fortytwo gate off` (plus a restart)
+removes it. Tune what is held in `/workspace/.claude/policy/capabilities.toml`
+and which Bash commands run freely in `/workspace/rules/bash-allowlist.jsonl`.
+The hook also applies to sessions you open by hand in `claude-code`, and a held
+action in a scheduled run is cleared with `npx fortytwo-gate list` and
+`npx fortytwo-gate approve <id>`.
+
 ## Updating
 
 Always stop the runtime first: `update` refuses to run against live services.
@@ -194,8 +212,9 @@ podman stop fortytwo
 podman exec claude-code bash -lc 'mkdir -p /workspace/db-backup &&
   sqlite3 /workspace/db/fortytwo.db ".backup /workspace/db-backup/fortytwo.db"'
 
-podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo update --dry-run'
-podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo update'
+# name the latest installer: the project's pinned CLI only knows the versions it shipped with
+podman exec -it claude-code bash -lc 'cd /workspace && npx @justfortytwo/installer@latest update --dry-run'
+podman exec -it claude-code bash -lc 'cd /workspace && npx @justfortytwo/installer@latest update'
 podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo doctor'
 
 podman start fortytwo

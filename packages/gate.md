@@ -6,7 +6,7 @@ decides, *before any tool runs*, whether a call is safe to auto-run, must be
 **fail-closed**: anything unrecognized, and anything that errors, is blocked
 rather than waved through.
 
-- **Version:** `0.1.1` · **Runtime:** Claude Code plugin, PreToolUse hook, or
+- **Version:** `1.0.0` · **Runtime:** Claude Code plugin, PreToolUse hook, or
   plain library · **Node:** >= 18 · **Leaf package** — no `@justfortytwo/*`
   peers, no database, no network
 
@@ -135,8 +135,12 @@ when ingesting web pages, messages, or tool output.
 | --- | --- | --- |
 | `GATE_MANIFEST` | `.claude/policy/capabilities.toml` | capability manifest TOML |
 | `GATE_BASH_ALLOWLIST` | `rules/bash-allowlist.jsonl` | bash allowlist JSONL |
-| `GATE_APPROVALS` | `.gate/approvals.jsonl` | durable one-shot approval store |
+| `GATE_APPROVALS` | `.gate/approvals.jsonl` | durable one-shot approval store; `approvalsPath(root, env?)` returns the resolved path for integrations that record decisions |
 | `GATE_ACTOR` | `agent` | audit-log actor label |
+
+Paths resolve from the project root: `CLAUDE_PROJECT_DIR`, which Claude Code
+sets for every hook, so the same files apply after the session changes
+directory; without it, the hook event's `cwd`.
 
 ## File formats
 
@@ -145,7 +149,12 @@ when ingesting web pages, messages, or tool output.
 prefix globs; `[bash]` regex patterns that only ever **elevate** Bash (and
 double as the denylist, highest match wins); `[guard].files` — project-relative
 paths whose edit is `irreversible` (point at the manifest, settings and
-allowlist so the gate can't be silently weakened).
+allowlist so the gate can't be silently weakened). An entry ending in `/`
+guards everything below that directory; `[guard].outside_project = true` also
+holds edits outside the project root. The guard covers `Write`, `Edit` and
+`NotebookEdit`; a path is checked as written and with symbolic links resolved,
+without regard to letter case, and a relative path is resolved from the
+session's current directory.
 
 **Bash allowlist** (JSONL, see `examples/bash-allowlist.jsonl`):
 `command_glob` (required, anchored, whole-command), `cwd_glob` (default `*`),

@@ -20,5 +20,5 @@ is published to npm, the prereleases remain under the `next` dist-tag and
 | [`@justfortytwo/runner`](./runner.md) | `1.0.0` | Claude Code process/session runtime |
 | [`@justfortytwo/scheduler`](./scheduler.md) | `1.0.0` | Durable scheduling and proactive jobs |
 | [`@justfortytwo/telegram`](./telegram.md) | `1.0.0` | Telegram transport/channel adapter |
-| [`@justfortytwo/gate`](./gate.md) | `0.1.1` | Optional safety/policy enforcement |
+| [`@justfortytwo/gate`](./gate.md) | `1.0.0` | Optional safety/policy enforcement |
 | [`@justfortytwo/salience`](./salience.md) | `0.1.1` | Optional model-driven salience extraction |

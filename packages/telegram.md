@@ -27,7 +27,15 @@ lifecycle entirely to runner — it makes no provider or model decisions.
    messages of at most 4000 UTF-16 units. Typing refreshes while submitted
    inputs await results. Deferred results produce a plain notice: Telegram
    cannot authorize the action — Claude Code owns tool permissions; gate is
-   optional policy through Claude hooks/plugins.
+   optional policy through Claude hooks/plugins. With `TELEGRAM_APPROVALS` set
+   (since 1.0.3), a deferral the gate staged as pending becomes a card with
+   **Approve** / **Deny** buttons showing the tool and its exact input. A tap
+   on the current card records the decision in the gate's approval store
+   (`approvalsPath`) and restarts the chat's Claude process on its saved
+   session with no input; the gate's hook then allows the call once or denies
+   it. A new message while a request waits denies it. An input over 3500
+   characters, or one containing a code fence, gets a notice without buttons.
+   A typed "yes" is never an approval.
 3. **Scheduler separation.** Proactive wakes remain the responsibility of the
    external `@justfortytwo/scheduler` daemon.
 
@@ -168,6 +176,7 @@ interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
 | `ALLOWED_CHAT_IDS` | no | Chat IDs authorized without a binding. |
 | `CLAUDE_BIN` | no | Path to `claude` (default `claude`). |
 | `FORTYTWO_CLAUDE_ARGS` | no | Extra arguments for every `claude` run, as a JSON array of strings (e.g. `["--chrome"]`). Set by `fortytwo start -- <args>`. A malformed value stops the bridge at boot. |
+| `TELEGRAM_APPROVALS` | no | `1`/`true`/`yes`/`on` lets authorized chats approve or deny actions held by the gate's hook. Off by default; `fortytwo start` sets it when the gate is on (`fortytwo gate on`). |
 | `TELEGRAM_BINDINGS_DB` | no | Bindings db path (default `state/telegram-bindings.db`). |
 | `DB_PATH` | no | Memory db path (default `db/fortytwo.db` relative to `FORTYTWO_ROOT`). |
 | `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Embedder handed to the conversation log (vectors are produced in the background). |
