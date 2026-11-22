@@ -10,6 +10,11 @@
         "FORTYTWO_MCP_EXTENSIONS": "@justfortytwo/transcript"
       }
     },
+    "fortytwo-scheduler": {
+      "command": "npx",
+      "args": ["-y", "-p", "@justfortytwo/scheduler", "fortytwo-scheduler-mcp"],
+      "env": { "DB_PATH": "db/fortytwo.db" }
+    },
     "whatsapp-work": {
       "type": "http",
       "url": "https://YOUR-WAHA-HOST/mcp",

@@ -113,7 +113,9 @@ podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo pair'
    with `--answers file.json`, or `FORTYTWO_<KEY>` variables.
 4. Writes secrets and `ALLOWED_CHAT_IDS` to `.env` (passed with
    `--telegram-bot-token` / `--allowed-chat-ids` or env, never prompted) and wires
-   the `fortytwo-memory` entry in `.mcp.json`, including the transcript tools.
+   the `fortytwo-memory` entry in `.mcp.json`, including the transcript tools,
+   plus the `fortytwo-scheduler` entry (the assistant's reminder tools, same
+   `DB_PATH`).
 5. Renders the persona (`CLAUDE.md` + `context/*`) from your answers. Rendering
    is idempotent and never overwrites what you edited by hand.
 6. Checks the embedding model on the Ollama server (pulling it if missing),
@@ -236,6 +238,31 @@ podman restart claude-code     # reload .mcp.json so the session sees new tools
 If something goes wrong, `npx fortytwo rollback` restores the previous version
 set (single step, manual). It does **not** undo a data migration; restore the
 backup for that.
+
+### Updating to memory 2.0 / scheduler 2.0 (installer 1.1.0)
+
+This upgrade moves the `jobs` queue from memory to the scheduler and adds
+memory migration `006_approvals_notified_at`. Take the backup above before it:
+`rollback` does not undo the migration. The existing `jobs` table and its rows
+are kept as they are.
+
+- `update` adds the `fortytwo-scheduler` entry to `.mcp.json` (the assistant's
+  `enqueue_job` / `list_jobs` / `cancel_job` tools); `podman restart
+  claude-code` so the session sees them.
+- **With the gate on**, a `capabilities.toml` written before this release holds
+  every job-tool call. Add under `[tiers]` the lines `fortytwo doctor` names:
+
+  ```toml
+  "mcp__fortytwo-scheduler__list_jobs" = "internal"
+  "mcp__fortytwo-scheduler__enqueue_job" = "internal"
+  ```
+
+  `cancel_job` is left out on purpose, so cancelling waits for your approval.
+- The persona text that tells the agent to use these tools for reminders (and
+  never `CronCreate`) lives in `context/INDEX.md`, which `update` does not
+  re-render. It arrives with `npx fortytwo init` (re-asks for your identity;
+  captured files you edited are kept).
+- Approvals still pending at the upgrade are announced once more.
 
 ### Updating from a pre-1.0 installation
 
