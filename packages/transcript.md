@@ -6,8 +6,9 @@ A searchable **conversation log** for fortytwo channels (Telegram, scheduler,
 only facts. It is a library: no bin, no server. The agent reaches it through
 tools added to the existing `fortytwo-memory` MCP server.
 
-- **Version:** `1.0.0` · **Runtime:** library (loaded by memory, telegram,
-  scheduler, persona and the installer) · **Node:** >= 20
+- **Version:** `1.0.1` (accepts memory 2.x; no other change) · **Runtime:**
+  library (loaded by memory, telegram, scheduler, persona and the installer) ·
+  **Node:** >= 20
 - Design record: `superpowers/specs/2026-10-27-transcript-design.md` and the
   matching plan in `superpowers/plans/` (kept in this repo, not published on
   the site).

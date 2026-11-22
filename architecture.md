@@ -125,8 +125,11 @@ agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP
   channel) is an optional notifier, never the system of record.
 - **Single writer for job execution.** Producers only insert `pending` rows;
   the scheduler daemon is the single writer of the `running` transition.
-- **No scheduler↔telegram coupling.** Both depend on `runner`; neither depends
-  on the other.
+- **No scheduler↔telegram coupling.** Both depend on `runner`; neither requires
+  the other. telegram loads the scheduler's job API lazily (an optional peer)
+  to queue undelivered replies, and drops them when it is absent.
+- **Memory produces no jobs.** The scheduler owns the `jobs` table and job API;
+  memory's staged approvals are an outbox the scheduler polls.
 
 ## Scope
 

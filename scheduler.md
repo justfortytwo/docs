@@ -31,8 +31,10 @@ through one mechanism.
 - **The LLM is the only expensive resource.** Scheduling, claiming, gating, and
   recurrence math are pure DB/JS and effectively free. An LLM turn happens *only*
   behind a gate that has already confirmed there is work.
-- **Durable state lives in `memory`.** Jobs are assistant state and belong next
-  to the registry, in one database — not in a second store.
+- **One database, owned schemas.** Jobs are assistant state and live in the
+  same SQLite file as memory, not in a second store. The scheduler owns the
+  `jobs` schema and the job API; memory owns the file handle (`openDb`, WAL,
+  `busy_timeout`) and the shared migration mechanism. Memory produces no jobs.
 - **Channel-agnostic output.** Every result is written to the conversation log
   (the transcript when `@justfortytwo/transcript` is installed; otherwise
   dropped); channels (Telegram today, others later) are *optional notifiers*,
@@ -59,40 +61,60 @@ Four packages, each with one job:
   `claude -p --output-format json`. Both the scheduler and the Telegram bridge
   depend on it; neither depends on the other. (The bridge's `runClaude` moves
   here.)
-- **`@justfortytwo/memory`** — gains the `jobs` table (migration `004_jobs`) and
-  a dependency-injected **`JobStore`** API. This is where durability lives.
+- **`@justfortytwo/memory`** — provides the database handle (`openDb`) and the
+  locked migration runner (`applyMigrations`) the scheduler's own migration
+  uses. It owns the `approvals` table, which doubles as an **outbox** the
+  scheduler polls (see [Event hooks](#event-hooks-reactive-jobs)).
 - **`@justfortytwo/telegram`** — loses the embedded `schedulerLoop` /
   `SCHEDULES` / `state.fired`; gains a **Telegram notifier** the scheduler
   delivers through, plus the event-enqueue call-sites it owns.
 
+The scheduler owns the `jobs` table (migration `004_jobs`) and the job API
+(`enqueue`, `claimDue`, `complete`, `fail`, `cancel`, …). It also ships the
+assistant's job tools, a second bin `fortytwo-scheduler-mcp` (see [Agent job
+tools](#agent-job-tools)).
+
 ```
                          ┌─────────────────────────────┐
    producers (enqueue)   │   @justfortytwo/scheduler    │
-   memory  ──────────▶   │  croner + ~30s claimDue poll │
-   gate    ──────────▶   │  p-queue(1) + handler reg.   │
-   bridge  ──────────▶   │                              │
-   assistant ────────▶   │   tick(now):                 │
+   bridge  ──────────▶   │  croner + ~30s claimDue poll │
+   assistant (MCP) ──▶   │  p-queue(1) + handler reg.   │
+                         │                              │
+                         │   tick(now):                 │
                          │     claimDue → gate?         │
    ┌──────────────┐      │       skip (0 tokens) ──┐    │
-   │   memory db  │◀────▶│       run → runner ─────┼─▶ claude -p
+   │ fortytwo.db  │◀────▶│       run → runner ─────┼─▶ claude -p
    │  jobs table  │      │     notify(result) ─────┘    │
+   │  approvals   │◀────▶│   approval outbox drain      │
    └──────────────┘      └──────────────┬──────────────┘
                                         │ notify
                   conversation log (always) + Telegram (if configured)
 ```
 
+**This changed after the MVP.** The first design put the `jobs` table and a
+`JobStore` in memory, and had memory and the gate enqueue jobs themselves
+(`reembed_memory`, `notify_pending`). That made memory depend on the
+scheduler's queue, and memory must not: it is a standalone store. Memory 2.0.0
+and scheduler 2.0.0 moved the schema and the API to the scheduler and removed
+memory's enqueues (below).
+
 ## Data model
 
-A single migration in `memory`, `004_jobs`:
+A single migration in `scheduler`, `004_jobs` (`runSchedulerMigrations`). It
+keeps the name it had when memory shipped it and is recorded in memory's
+`_migration_state` table under the same lock, so a database that already has
+the table skips it; the DDL is `CREATE TABLE IF NOT EXISTS`. Every process that
+opens the database and touches jobs runs it after memory's migrations: the
+daemon, the Telegram bridge and the installer.
 
 ```
 jobs(
   id          integer primary key,
-  kind        text    not null,   -- 'daily_briefing' | 'sweep' | 'reembed_memory' | 'reminder' | ...
+  kind        text    not null,   -- 'daily_briefing' | 'sweep' | 'reminder' | 'reply' | ...
   payload     text,               -- JSON, job-specific arguments
   run_at      text    not null,   -- ISO timestamp: when it is due
   recurrence  text,               -- cron string; NULL = one-off
-  status      text    not null,   -- 'pending' | 'running' | 'done' | 'failed' | 'skipped'
+  status      text    not null,   -- 'pending' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled'
   attempts    integer not null default 0,
   last_error  text,
   created_at  text    not null,
@@ -110,22 +132,25 @@ selects it again at its next slot. A recurring row is never terminal.
 
 Each is small and independently testable.
 
-- **`JobStore`** (in `memory`, DI'd like the other stores): `enqueue(job)`,
-  `claimDue(now)` (atomically flips due `pending` rows to `running` and returns
-  them), `complete(id, { reschedule? })`, `fail(id, error, { retryAt? })`,
-  `listRecurring()`. Unit-tested against a file database.
+- **Job API** (in `scheduler`, `src/jobs.ts`; first designed as a `JobStore`
+  in `memory`): `enqueue(job)`, `claimDue(now)` (atomically flips due
+  `pending` rows to `running` and returns them), `complete(id, { reschedule? })`,
+  `fail(id, error, { retryAt? })`, `listActive()`, `requeueStale()`,
+  `existsPending()`, `setRecurrence()`, and `cancel(id, { kinds? })` (a
+  **pending** row becomes `cancelled`; running rows are refused). Unit-tested
+  against a file database.
 - **Handler registry** (in `scheduler`): each `kind` registers
   `{ hasWork?(ctx), run(ctx) }`.
   - `hasWork` is the **cheap, non-LLM gate** — a pure DB query. Absent ⇒ the job
     always runs.
   - `run` does the work: fires an LLM turn via the runner, or does pure work
-    (e.g. `reembed_memory`).
+    (e.g. `reembed_memory`, kept for jobs queued by older installs).
 - **`tick(now)`** — the pure heart of the loop, dependency-injected so it tests
   without a network or an LLM. For each claimed-due job: evaluate `hasWork`; if
   false, `complete(skipped)` + reschedule (**0 tokens**); if true, push `run`
   onto the p-queue; on completion, notify and (if recurring) reschedule.
 - **`daemon`** — the only impure part. Wires croner + the ~30s poll + the real
-  `JobStore` + the runner + the notifier.
+  job API + the approval outbox + the runner + the notifier.
 - **`Notifier`** interface — `notify(result)`. The default appends to the
   **conversation log** (the transcript when `@justfortytwo/transcript` is
   installed; otherwise dropped). An optional **Telegram notifier** (push to the
@@ -137,13 +162,15 @@ Each is small and independently testable.
 | --- | --- | --- | --- |
 | Built-in recurring | `daily_briefing`, `sweep`, `learn_review` | cron | yes — skip if nothing to do |
 | User-defined recurring | "check my emails every morning" | cron | optional (default: always run) |
-| One-off durable | `reminder`, `reembed_memory` | `NULL` | optional |
-| Reactive (event-driven) | `notify_pending`, `reply` | `NULL` | inherent — only enqueued when real |
+| One-off durable | `reminder` | `NULL` | optional |
+| Reactive (event-driven) | `reply`; `notify_pending` (run by the approval outbox, not queued) | `NULL` | inherent — only runs when real |
 
 User-defined recurring jobs generalize the built-ins: a cron string plus a
 trigger prompt. This is why external adapters (calendar, email) can wait — they
 are absorbed for now by recurring prompts that use whatever tools/skills the
-assistant has that turn.
+assistant has that turn. As shipped, the assistant creates them only as
+`reminder` rows, one-off or with a cron, through its [job
+tools](#agent-job-tools).
 
 ## Control flow
 
@@ -204,17 +231,24 @@ The *only* token cost in the system is a `run` whose gate has already passed.
 ## Event hooks (reactive jobs)
 
 An "event hook" here is simply **a point in another component's code where, when
-something real happens, it calls `JobStore.enqueue(...)`**. The scheduler never
-polls the outside world; producers tell it there is work by writing a row.
+something real happens, it calls the scheduler's `enqueue(...)`**. The scheduler
+never polls the outside world for work; producers tell it there is work by
+writing a row. The one exception is memory's approval outbox (below), which the
+scheduler polls so that memory never has to write a job.
 
-MVP producers:
+Producers as shipped:
 
 | Producer | Event | Enqueues |
 | --- | --- | --- |
-| `memory` (store path) | a memory is stored | `reembed_memory` |
-| `gate` | a tool call is deferred (pending approval) | `notify_pending` |
 | `telegram` bridge | inbound while a turn is mid-flight / owner unreachable | `reply` |
-| assistant | owner says "remind me at 5pm" | `reminder` |
+| assistant (`enqueue_job`) | owner says "remind me at 5pm" | `reminder` |
+
+The MVP table also listed memory (a stored memory → `reembed_memory`) and the
+gate (a deferred tool call → `notify_pending`, enqueued when memory's approval
+store staged it). Both are gone since memory
+2.0.0: `store()` embeds in the same write, so there is nothing to re-embed, and
+an approval is announced through the outbox instead. The `reembed_memory`
+handler stays for jobs queued by older installs; nothing enqueues it.
 
 Because producers are **separate processes** and SQLite has no pub/sub, the
 daemon notices newly-enqueued jobs through the **cheap ~30s `claimDue` poll** —
@@ -225,13 +259,61 @@ recurrence math, not as the sole wake source.
 Reactive jobs have **no `hasWork` gate** — being enqueued *is* the signal that
 there is work, so they always run. De-duplication therefore happens at the
 **enqueue site**: a producer must not enqueue a second job of the same kind for
-the same target while one is still `pending`/`running` (e.g. the gate does not
-enqueue a second `notify_pending` for an approval that already has one
-outstanding). This is what keeps reactive wakes from duplicating.
+the same target while one is still `pending`/`running` (the bridge checks
+`existsPending` before it queues a `reply`). This is what keeps reactive wakes
+from duplicating.
+
+### Approval outbox
+
+Staging an approval queues no job. Memory's `approvals` row is the outbox:
+`notified_at` (migration `006_approvals_notified_at`) stays `NULL` until the
+owner has been told, and `addPending` resets it when an approval is staged
+again. On every ~30s poll, inside the same overlap guard and through the same
+p-queue as `tick`, the daemon lists the un-notified pending approvals
+(`listUnnotifiedApprovals`), runs the `notify_pending` handler for them,
+delivers its text, and **only then** stamps them (`markApprovalsNotified`). So
+every staged approval is notified **at least once**, including one staged while
+a notification is running. A run that fails or produces no text stamps nothing
+and backs off 1, 5, then 30 minutes. Latency is up to one poll period plus any
+job running ahead of it. Approvals still pending when migration 006 runs start
+un-notified and are announced once more. The `sweep` gate cannot do this job:
+it runs twice a day.
 
 External adapters (`triage` from calendar/email) are **deferred**; they attach as
 new producers later, or are served in the meantime by user-defined recurring
 jobs.
+
+## Agent job tools
+
+The assistant schedules work on the durable queue, not on a session-local cron
+that dies with the session. The scheduler ships a second bin,
+`fortytwo-scheduler-mcp`: a stdio MCP server (id `fortytwo-scheduler`) with
+three tools.
+
+| Tool | Does |
+| --- | --- |
+| `enqueue_job` | creates a `reminder` at `run_at` and/or on a cron |
+| `list_jobs` | lists active (pending and running) jobs; system jobs without payload |
+| `cancel_job` | cancels a pending reminder |
+
+Limits, enforced in code (`src/agent-jobs.ts`):
+
+- **`reminder` only.** `reply`, `notify_pending`, `reembed_memory`, Oneiros and
+  the built-in kinds are system-owned: the agent can neither create nor cancel
+  them.
+- **Text is untrusted.** Payload is exactly `{ "text": "..." }`, one line, at
+  most 500 characters; it reaches a prompt as `Reminder: <text>`.
+- **No flooding.** A past `run_at` is rejected; a cron may fire at most hourly;
+  at most 20 active agent jobs, counted in the insert's write transaction.
+- **Cancel** refuses running jobs and seeded (system) jobs.
+
+The server runs no migrations: it opens the same `DB_PATH` as memory and waits
+for the daemon or the installer to create the table. The installer writes its
+`.mcp.json` entry, and the gate manifest it ships tiers `list_jobs` and
+`enqueue_job` `internal` (they only write the local queue, and every scheduled
+turn runs under the gate) and `cancel_job` `irreversible` (owner approval). The
+persona's `context/INDEX.md` tells the agent to use these tools for reminders
+and never `CronCreate`.
 
 ## Decoupling from Telegram
 
@@ -251,7 +333,9 @@ interactive messages.
   `UPDATE jobs SET status='running', updated_at=… WHERE status='pending' AND run_at <= now RETURNING *`
   — with the database in **WAL** mode. There is no cross-process race on the
   claim itself; the only cross-process interaction is the poll noticing new
-  `pending` inserts, which is the intended behavior.
+  `pending` inserts, which is the intended behavior. `cancel_job` (another
+  process) changes only `pending` rows, in one UPDATE, so a row the daemon
+  claims at the same moment is reported as running and left alone.
 - **Stale-claim recovery.** On restart (or after a crash), `running` rows older
   than `STALE_RUNNING_MS` (default **15 min**, a config constant) are returned to
   `pending` so they re-run.
@@ -264,8 +348,8 @@ interactive messages.
 
 ## Testing
 
-- `JobStore` (in `memory`): `claimDue` atomicity, `complete`/`fail`, reschedule —
-  against a file database.
+- Job API (in `scheduler`): `claimDue` atomicity, `complete`/`fail`,
+  reschedule, `cancel` — against a file database.
 - `tick()` (in `scheduler`): pure, with a fake store + a DI'd registry —
   gate-skips-without-LLM, gate-runs-with-work, recurring reschedule, one-off
   completion, failure/backoff. No network, no LLM.
@@ -276,16 +360,19 @@ interactive messages.
 **MVP:** the four built-in recurring gated jobs; `reembed_memory` (the first
 durable one-off, closing an existing stub) with its enqueue point in memory's
 store path; `notify_pending` and `reply` reactive jobs; the `reminder` one-off.
+(The `reembed_memory` and `notify_pending` enqueues in memory were removed in
+2.0.0; see [Event hooks](#event-hooks-reactive-jobs).)
 **Deferred:** external channel adapters (`triage`), richer retry/backoff policy,
 and a `fortytwo` CLI surface for inspecting/managing the queue.
 
 **Since the MVP:** owner-selectable built-ins and a time zone (above); output
 goes to the conversation log in `@justfortytwo/transcript` rather than to a
-memory journal.
+memory journal; the `jobs` table and job API moved from memory to the
+scheduler, approvals are announced through an outbox, and the assistant
+schedules reminders with its [job tools](#agent-job-tools).
 
 **Open:**
 
 - The `sweep` gate counts memory's `approvals` table, not the gate's approval
   file, so it does not see actions held by the gate hook.
-- The assistant has no tool to create reminder or other one-off jobs itself.
 - Per-job custom times are not configurable.

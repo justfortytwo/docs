@@ -4,7 +4,7 @@ The **Telegram channel adapter** for fortytwo — a standalone, always-on
 **bridge** connecting a Telegram bot to persistent Claude Code sessions through
 `@justfortytwo/runner`.
 
-- **Version:** `1.0.3` · **Runtime:** long-running bridge, `bin` is
+- **Version:** `1.1.0` · **Runtime:** long-running bridge, `bin` is
   `fortytwo-telegram-bridge` · **Node:** >= 20
 
 ## Why this exists
@@ -38,6 +38,13 @@ lifecycle entirely to runner — it makes no provider or model decisions.
    A typed "yes" is never an approval.
 3. **Scheduler separation.** Proactive wakes remain the responsibility of the
    external `@justfortytwo/scheduler` daemon.
+4. **Context from elsewhere.** A reply to an earlier message carries that
+   message's text (or the selected part, cut at 4000 characters) in front of
+   the new one (since 1.0.4). Messages the scheduler sent since the owner's
+   previous message in that chat (conversation log, channel `scheduler`; at
+   most the latest 5, each cut at 3000 characters) are put in front of the
+   next inbound message (since 1.0.5; needs `@justfortytwo/transcript`). Both
+   are marked as context, not as new instructions.
 
 ### Attachments
 
@@ -140,9 +147,17 @@ a memory-backed `BindingStore` — the login flow is unaffected.
 | `@justfortytwo/gate` (regular dep) | `createSourceEnvelope` provenance helper in `attachments.ts` — the *policy hook* stays optional and separately configured | `POLICY_SCHEMA_VERSION` |
 | `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the shared DB at startup; recall happens inside the headless `claude` turn via the memory MCP tools | `MEMORY_TOOL_CONTRACT_VERSION` |
 | `@justfortytwo/transcript` *(new, optional peer, loaded dynamically)* | the `ConversationLog` implementation that persists each channel event (see below) | `createTranscript` / `prepareTranscript` |
+| `@justfortytwo/scheduler` (optional peer `^2.0.0`, loaded dynamically) | the reply queue: the `jobs` table and job API | `runSchedulerMigrations`, `enqueue`, `existsPending` |
 
 If the memory peer is absent, the bridge degrades to **channel-only**
 (messages relay but are not persisted) rather than refusing to start.
+
+The reply queue (a reply that could not be delivered inline, left for the
+scheduler as a `reply` job) needs memory **and** the scheduler, which owns the
+`jobs` table since 2.0.0. The bridge runs `runSchedulerMigrations` after
+memory's migrations and checks `existsPending` before it enqueues. Without the
+scheduler, or with one older than the job API, such replies are dropped and the
+bridge says so on stderr. memory is accepted as `^0.1.5 || ^1.0.0 || ^2.0.0`.
 
 ### Conversation log
 

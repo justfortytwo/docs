@@ -1,15 +1,17 @@
 # `@justfortytwo/scheduler`
 
-Durable job scheduler daemon for fortytwo. Drains a `jobs` queue stored in
-`@justfortytwo/memory` and fires LLM turns only behind a cheap "is there
-work?" gate.
+Durable job scheduler daemon for fortytwo. Owns the `jobs` queue (its schema
+and API), kept in the database opened by `@justfortytwo/memory`, and fires LLM
+turns only behind a cheap "is there work?" gate. It also ships the assistant's
+job tools as an MCP server.
 
 The design rationale — durable jobs, token gating, crash safety, event hooks —
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
-- **Version:** `1.0.6` · **Runtime:** standalone daemon, `bin` is
-  `fortytwo-scheduler` · **Node:** >= 20
+- **Version:** `2.0.0` · **Runtime:** standalone daemon, `bin` is
+  `fortytwo-scheduler`; second `bin` `fortytwo-scheduler-mcp` (stdio MCP) ·
+  **Node:** >= 20
 
 ## Why this exists
 
@@ -22,13 +24,17 @@ the agent reasons about it.
 
 | Component | File | Role |
 |-----------|------|------|
+| Job API | `src/jobs.ts` | `enqueue`, `claimDue`, `complete`, `fail`, `listActive`, `requeueStale`, `existsPending`, `setRecurrence`, `cancel` |
+| Migrations | `src/migrate.ts` | `SCHEDULER_MIGRATIONS` (`004_jobs`) + `runSchedulerMigrations()` |
 | Handler registry | `src/registry.ts` | maps job `kind` → `Handler` |
 | `tick()` | `src/tick.ts` | pure, fully injectable: claim due jobs → gate check → enqueue run → notify → reschedule/complete; backoff on error |
 | Daemon | `src/daemon.ts` | croner + p-queue (concurrency 1) wiring around `tick()`, ~30 s poll |
 | Recurring seeds | `src/seed.ts`, `src/handlers/index.ts` | idempotent seeding of `RECURRING_DEFS` on every boot; only inserts/updates rows when a definition changes |
 | Heartbeat | `src/heartbeat.ts` | liveness file for `fortytwo doctor` |
 | Oneiros | `src/oneiros.ts` | persona maintenance job (see below) |
-| Notifier | `src/notifier.ts` | optional Telegram push |
+| Notifier | `src/notifier.ts` | journal + optional Telegram push |
+| Approval outbox | `src/approval-outbox.ts` | notifies staged approvals, then stamps them |
+| Agent job tools | `src/mcp.ts`, `src/agent-jobs.ts` | `fortytwo-scheduler-mcp`: `enqueue_job`, `list_jobs`, `cancel_job` |
 
 ## Library usage
 
@@ -46,6 +52,37 @@ await tick({
 `Handler` shape: `{ kind, run(ctx), hasWork?(ctx) }`. A `hasWork` gate is the
 cheap check that runs **before** an LLM turn is spent.
 
+## Jobs queue
+
+The `jobs` table and the job API used to live in `@justfortytwo/memory`; since
+2.0.0 they are imported from here:
+
+```ts
+import { openDb, runMigrations } from '@justfortytwo/memory';
+import { runSchedulerMigrations, enqueue } from '@justfortytwo/scheduler';
+
+const h = openDb('fortytwo.db');
+await runMigrations(h.k);          // memory's schema
+await runSchedulerMigrations(h.k); // the jobs table (migration 004_jobs)
+```
+
+Exports: `enqueue`, `claimDue`, `complete`, `fail`, `listActive`,
+`requeueStale`, `existsPending`, `setRecurrence`, `cancel`, `MAX_ATTEMPTS`,
+`JobRow`, `NewJob`, `CancelResult`, `SCHEDULER_MIGRATIONS`,
+`runSchedulerMigrations`.
+
+- **Migration.** `004_jobs` keeps the name it had in memory and is recorded in
+  memory's `_migration_state` under the same lock (`applyMigrations`); the DDL
+  is `CREATE TABLE IF NOT EXISTS`. An install that got the table from memory
+  1.x skips it; on a fresh database it runs after memory's migrations. The
+  daemon, the Telegram bridge and the installer all run it.
+- **`cancel(h, id, { kinds? })`** sets a **pending** job to `cancelled`, a
+  terminal status. A running or finished job is refused, and so is a kind not
+  in `kinds` when given. Check and change are one UPDATE, so a job the daemon
+  claims at the same moment is reported as running.
+- `countPendingApprovals` (the `sweep` gate) stays in memory, which owns the
+  `approvals` table.
+
 ## Job kinds (as built)
 
 | kind | schedule | gate | behavior |
@@ -53,10 +90,10 @@ cheap check that runs **before** an LLM turn is spent.
 | `daily_briefing` | `57 7 * * *` (07:57) | none | runs the `daily-briefing` skill and sends the rundown |
 | `sweep` | `3 13,18 * * *` | pending rows in memory's `approvals` table > 0 (not the gate's approval file) | open-thread sweep, one-line status |
 | `learn_review` | `17 9 * * 0` | recent memory rows (7 d) > 0; counts facts only, since chat and notifications moved to the transcript | runs the `learn-review` skill: propose-only rules, candidate skills and memory cleanups from the last 7 days |
-| `notify_pending` | one-off | none | notify about pending items |
+| `notify_pending` | approval outbox (every poll) | un-notified pending approvals | notify about pending approvals (see [Approval notifications](#approval-notifications)); a queued job with the legacy `payload.id` still runs |
 | `reply` | one-off | none | send a reply via the runner |
-| `reminder` | one-off | none | send a reminder via the runner |
-| `reembed_memory` | maintenance | none | re-embeds one memory by id in-place (**no LLM**, no notification) |
+| `reminder` | one-off or cron (from `enqueue_job`) | none | send a reminder via the runner |
+| `reembed_memory` | maintenance | none | re-embeds one memory by id in-place (**no LLM**, no notification). **No producer** since memory 2.0.0 (`store()` embeds in its own write); kept for jobs queued by older installs |
 | `persona.oneiros` | `17 3 * * *` (03:17) | memory-head or transcript-head check | persona maintenance (below) |
 
 ### Choosing the built-in schedules
@@ -107,6 +144,77 @@ On every run the job checks for `<name>/SKILL.md` in that directory and in
 sends a short "run the skill" prompt. Without it, it sends a self-contained
 prompt that states the task and its limits, so a scheduler running without the
 installer still produces a sensible result.
+
+### With the safety gate on
+
+A scheduled run has nobody waiting to approve a held action. When the gate
+holds a tool call, the run ends there and is not resumed; the job reports which
+job stopped and the exact action that was held (`src/held.ts`, since 1.0.7). It
+stops at the same point on the next run until that action is allowed in the
+gate's policy. Oneiros runs in its own locked-down worker and sends no such
+notice.
+
+## Approval notifications
+
+When the safety gate stages an approval, memory queues no job: the approval row
+waits with `notified_at` unset (memory migration `006_approvals_notified_at`).
+On every poll (`POLL_MS`, 30 s), inside the overlap guard and through the same
+p-queue as `tick`, the daemon runs `notify_pending` for those approvals, sends
+the result like any notification, and **then** stamps `notified_at`. Each
+staged approval is notified at least once, including one staged while a
+notification is already running. The delay is up to one poll period, plus any
+job running ahead of it. A run that fails or produces no text stamps nothing
+and is retried after 1, 5, then 30 minutes.
+
+## Agent job tools
+
+`fortytwo-scheduler-mcp` is a stdio MCP server that lets the assistant put jobs
+on the durable queue instead of a session-local cron. The installer registers
+it in `.mcp.json` as `fortytwo-scheduler` (tools
+`mcp__fortytwo-scheduler__*`), on the same `DB_PATH` as memory:
+
+```json
+"fortytwo-scheduler": {
+  "command": "npx",
+  "args": ["-y", "-p", "@justfortytwo/scheduler", "fortytwo-scheduler-mcp"],
+  "env": { "DB_PATH": "db/fortytwo.db" }
+}
+```
+
+| Tool | What it does |
+| --- | --- |
+| `enqueue_job` | `{ kind, payload, run_at?, timezone?, recurrence? }`: creates a job the daemon fires with no session open |
+| `list_jobs` | active jobs (**pending and running**), soonest first; system jobs without their payload; `cancellable` marks what `cancel_job` accepts |
+| `cancel_job` | `{ id }`: cancels a pending reminder |
+
+Rules (`src/agent-jobs.ts`):
+
+- **Kinds:** `reminder` only. `reply`, `notify_pending`, `reembed_memory`,
+  Oneiros and the built-in recurring kinds are system-owned: the agent can
+  neither create nor cancel them.
+- **Payload:** exactly `{ "text": "..." }`, one line, 1 to 500 characters. It
+  reaches a prompt as `Reminder: <text>`, so it is treated as untrusted: other
+  keys, newlines and control characters are rejected.
+- **`run_at`:** ISO-8601 with `Z` or an offset, or without one plus `timezone`
+  (IANA); stored as UTC. Malformed values and times in the past are rejected.
+- **`recurrence`:** a cron read in the install time zone, at most once an hour.
+  Without `run_at` the first run is the cron's next one.
+- **Cap:** at most 20 active agent jobs, checked in the insert's write
+  transaction.
+- **Cancel:** pending reminders only; running jobs and built-in or system jobs
+  are refused.
+
+The server runs **no migrations**: it opens `DB_PATH` (which must exist) with
+memory's `openDb`; until the `jobs` table exists every tool returns an error.
+Env: `DB_PATH` (required), `FORTYTWO_ROOT` (for the time zone in
+`.fortytwo/schedules.json`).
+
+**Safety gate:** the capability manifest the installer ships tiers `list_jobs`
+and `enqueue_job` `internal` (they only write the local queue, within the caps
+above, and every scheduled turn runs under the gate) and `cancel_job`
+`irreversible`, so cancelling waits for the owner's approval. A manifest written
+before these entries existed holds every call until the two `internal` lines
+are added; `fortytwo doctor` names them.
 
 ## Oneiros maintenance
 
@@ -180,8 +288,10 @@ actor `assistant` and kind = the notification kind.
 
 ## Dependencies
 
-- `@justfortytwo/memory` (pinned `1.0.1`) — the `jobs` table and `JobStore`.
-- `@justfortytwo/runner` — LLM turns for handlers.
+- `@justfortytwo/memory` (pinned `2.0.0`) — the database handle (`openDb`),
+  `applyMigrations`, the approvals outbox and `countPendingApprovals`.
+- `@justfortytwo/runner` (pinned `1.0.1`) — LLM turns for handlers.
+- `@modelcontextprotocol/sdk` — the `fortytwo-scheduler-mcp` server.
 - `@justfortytwo/persona` (pinned `1.0.2`) — Oneiros `hasWork`/`refine`/
   `workerPrompt`.
 - `@justfortytwo/telegram` — **optional peer**; enables the Telegram notifier.
@@ -197,8 +307,10 @@ npm test        # vitest run
 
 ## Scope
 
-**In scope:** claiming, gating, recurrence math, retries/backoff, seeding,
-heartbeat, notifications.
+**In scope:** the `jobs` schema and job API, claiming, gating, recurrence math,
+retries/backoff, seeding, heartbeat, notifications, the approval outbox drain,
+the agent job tools.
 
-**Out of scope:** what the agent does during a turn (runner + Claude Code),
-where jobs live (memory's `jobs` table), channel identity (telegram).
+**Out of scope:** what the agent does during a turn (runner + Claude Code), the
+database file and its handle (memory), the approvals table (memory), channel
+identity (telegram).

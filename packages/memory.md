@@ -9,7 +9,8 @@ It is **persona-agnostic**: no chat/persona/approval coupling, just a
 generic memory store and tool surface. It can be used on its own, as a library,
 or through `@justfortytwo/installer`, which registers it in your project.
 
-- **Version:** `1.0.1` (widens the optional gate peer to `^0.1.0 || ^1.0.0`; no other change) · **Runtime:** MCP server over stdio, `bin` is
+- **Version:** `2.0.0` (the jobs queue moves to the scheduler; see
+  [Jobs](#jobs-not-in-memory)) · **Runtime:** MCP server over stdio, `bin` is
   `fortytwo-memory` · **Node:** >= 20
 
 [`sqlite-vec`]: https://github.com/asg017/sqlite-vec
@@ -121,8 +122,13 @@ SQLite via `better-sqlite3` + `knex` migrations (`src/migrations/`, applied by
 | `001_init` | `memories`, `index_state` |
 | `002_fts` | `memory_fts` (FTS5, content-linked to `memories`) |
 | `003_approvals` | `approvals`, `audit_log` (gate seam) |
-| `004_jobs` | `jobs` (shared with the scheduler, see [Scheduler](../scheduler.md)) |
+| `004_jobs` | not in memory since 2.0.0: owned by the scheduler (see below) |
 | `005_memory_identity` | `memory_identity` (stable database identity) |
+| `006_approvals_notified_at` | `approvals.notified_at` (approval outbox stamp) |
+
+`applyMigrations(knex, migrations)` runs any migration list through the same
+locked, transactional loop and the same `_migration_state` table, so sibling
+packages (transcript, scheduler) add their tables without a second mechanism.
 
 Vector columns are fixed at **1024 dims** (`sqlite-vec`); a model with a
 different dimensionality requires a schema change.
@@ -153,17 +159,39 @@ Remote providers are opt-in via `EMBED_PROVIDER=openai`; only models that emit
 > `reembed(h, embedder, id)` (one id at a time; no bulk command or MCP tool)
 > and re-run `reindex` for docs after switching.
 
+## Jobs (not in memory)
+
+Since 2.0.0 memory neither owns nor produces jobs. The `jobs` table (migration
+`004_jobs`) and the job API (`enqueue`, `claimDue`, …) belong to
+[`@justfortytwo/scheduler`](./scheduler.md), which applies the migration under
+its old name through `applyMigrations`, so existing databases skip it.
+
+- `store()` no longer enqueues `reembed_memory`: it embeds in the same write.
+- Staging an approval no longer enqueues `notify_pending`. The `approvals` row
+  is an **outbox**: `notified_at` stays `NULL` until the owner is told, and
+  `addPending` resets it when an approval is staged again. The scheduler polls
+  `listUnnotifiedApprovals(h)`, notifies, then calls
+  `markApprovalsNotified(h, ids, at)`. Approvals still pending when migration
+  006 runs are announced once more.
+
+Upgrade memory together with scheduler 2.0.0: scheduler 1.0.7 and earlier
+import the job API from memory and fail to load.
+
 ## Library API
 
 ```ts
 import {
   openDb, runMigrations, OllamaEmbedder, embedderFromEnv,
   store, recall, deleteByIds, enrich, enrichFromTurn,
-  memoryHead, memoryDelta,
+  memoryHead, memoryDelta, applyMigrations,
+  listUnnotifiedApprovals, markApprovalsNotified, countPendingApprovals,
 } from '@justfortytwo/memory';
 ```
 
-- `openDb(path)` / `runMigrations(knex)` — open and migrate the database.
+- `openDb(path)` / `runMigrations(knex)` — open (WAL, `busy_timeout`) and
+  migrate the database. `applyMigrations` runs a sibling's migration list.
+- `listUnnotifiedApprovals` / `markApprovalsNotified` — the approval outbox
+  (above). `countPendingApprovals` — the scheduler's `sweep` gate.
 - `store` / `recall` / `query` / `lexical` — same operations the MCP tools
   expose.
 - `deleteByIds(h, ids)` — hard-delete (row + vector + FTS). Intentionally a

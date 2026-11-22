@@ -18,8 +18,9 @@ no tests, no lint config, no CI. Remote: `git@github.com:justfortytwo/docs.git`.
 ```
 README.md      Repo intro + Index of design docs (keep in sync when adding docs)
 architecture.md  Cross-repository system overview (ownership map, principles)
-scheduler.md   Scheduler & Durable Jobs design (jobs table, JobStore, tick,
-               token-gating, event hooks, crash-safety, MVP scope)
+scheduler.md   Scheduler & Durable Jobs design (jobs table, job API, tick,
+               token-gating, event hooks, approval outbox, agent job tools,
+               crash-safety, MVP scope)
 homelab.md     Deployment guide: always-on setup in containers (cross-package)
 examples/      Companion files for guides (examples/homelab: compose files,
                Dockerfile, .env/.mcp.json examples). Not Markdown, so not
@@ -65,23 +66,30 @@ checking relative links — the build warns about broken links.
 - The LLM is the only expensive resource: scheduling, claiming, gating and
   recurrence math are pure DB/JS; an LLM turn runs only after a cheap
   `hasWork` gate passes.
-- Durable state lives in `@justfortytwo/memory` (a `jobs` table, migration
-  `004_jobs`, and a DI'd `JobStore`), next to the approvals table and durable
-  memories. Chat and scheduler notifications are not in memory: they live in
+- One SQLite file (`fortytwo.db`), owned schemas: `@justfortytwo/scheduler` owns
+  the `jobs` table (migration `004_jobs`, recorded in memory's
+  `_migration_state`) and the job API (`enqueue`, `claimDue`, ..., `cancel`);
+  `@justfortytwo/memory` owns the handle (`openDb`), `applyMigrations`, the
+  approvals table and durable memories, and produces no jobs (since memory
+  2.0.0). Chat and scheduler notifications are not in memory: they live in
   `@justfortytwo/transcript`.
 - `@justfortytwo/scheduler` is a standalone daemon (croner + ~30s `claimDue`
   poll + p-queue concurrency 1 + handler registry keyed by `kind`).
 - `@justfortytwo/runner` wraps headless `claude -p --output-format json`;
-  scheduler and telegram both depend on it, not on each other.
+  scheduler and telegram both depend on it, not on each other (telegram loads
+  the scheduler's job API lazily, as an optional peer, for its reply queue).
 - Output is channel-agnostic: written to the conversation log in
   `@justfortytwo/transcript` (a no-op when transcript is not installed);
   Telegram is an optional notifier.
 - Built-in schedules are owner-selectable (`.fortytwo/schedules.json`: per-kind
   `enabled` plus an optional IANA `timezone`, read once at boot; an unreadable
   file stops the daemon).
-- Producers only insert `pending` rows; the daemon is the single writer of the
-  `running` transition (SQLite in WAL mode). Reactive jobs are de-duplicated
-  at the enqueue site.
+- Producers (the Telegram bridge's `reply`, the assistant's `reminder` via the
+  `fortytwo-scheduler-mcp` tools) only insert `pending` rows; the daemon is the
+  single writer of the `running` transition (SQLite in WAL mode). Reactive jobs
+  are de-duplicated at the enqueue site.
+- Staged approvals are an outbox (`approvals.notified_at`, memory migration
+  `006`): the daemon notifies, then stamps, on its ~30s poll.
 
 ## Gotchas
 
