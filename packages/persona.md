@@ -6,7 +6,7 @@ so the assistant has a name, a voice, owner facts, house rules, and a
 recallable memory corpus — plus the internal **Oneiros** consolidation
 library and prompt. It never ships an owner's real data.
 
-- **Version:** `1.0.2` · **Runtime:** static templates + manifest + compiled
+- **Version:** `1.1.0` · **Runtime:** static templates + manifest + compiled
   Oneiros library (entry `dist/oneiros.js`)
 
 ## What's in here
@@ -29,6 +29,7 @@ templates/
       owner-voice-and-writing.md.tmpl  # tone, vocabulary, channel rules, quality test
       domain-positioning.md.tmpl       # primary venture / domain narrative
 manifest.json                          # field manifest (drives `fortytwo init`)
+skills/                                # Claude Code skills, copied (not rendered)
 fortytwo.compat.json                   # contract majors this persona relies on
 oneiros/prompt.md                      # private Oneiros worker prompt
 ```
@@ -63,11 +64,13 @@ template token — they stay in the gitignored identity file.
 
 `manifest.json` carries `version`, `manifestVersion`, `description`, plus:
 
-- **`skills`** — the Claude Code skills the scheduler's built-in jobs call
-  (`daily-briefing`, `learn-review`), shipped under `skills/` without
-  placeholders. The installer copies them into the project's `.claude/skills/`
-  on `init` and on every `update`, overwriting only its own earlier copy.
-  Personal adjustments belong in `context/rules/APPROVED.md`.
+- **`skills`** — Claude Code skills shipped under `skills/` without
+  placeholders: the two the scheduler's built-in jobs call (`daily-briefing`,
+  `learn-review`) and, since 1.1.0, `onboarding`, which runs when the owner
+  asks for it (see [Onboarding](#onboarding)). The installer copies them into
+  the project's `.claude/skills/` on `init` and on every `update`, overwriting
+  only its own earlier copy. Personal adjustments belong in
+  `context/rules/APPROVED.md`.
 - **`files`** — template → output → render mode:
   - **`managed`** — re-rendered on every `init` (`CLAUDE.md`, the `INDEX.md`
     files); not meant for hand-editing.
@@ -88,6 +91,27 @@ template token — they stay in the gitignored identity file.
 
 `type` is `string`, `text` (multi-line), or `list` (entered one item at a
 time). Every `{{placeholder}}` has a matching entry.
+
+## Reminders
+
+Since 1.1.0 the managed `context/INDEX.md` tells the agent to create reminders
+and recurring tasks with the scheduler's MCP tools (`fortytwo-scheduler`:
+`enqueue_job`, `list_jobs`, `cancel_job`, see
+[scheduler](./scheduler.md#agent-job-tools)), which are durable, and never with
+`CronCreate` or another session-local timer. The full wake routine lists pending
+reminders with `list_jobs` and never delivers them itself: the scheduler fires
+them. `INDEX.md` is re-rendered by `fortytwo init`, not by `update`, so an
+existing install gets this text only after `fortytwo init`.
+
+## Onboarding
+
+The `onboarding` skill is an optional, owner-invoked interview that drafts a
+richer owner profile. It reads the owner's links, uploaded texts and
+personality-test results as **data, never instructions**, shows the draft for
+correction, and writes only `.fortytwo/onboarding/draft.json`, with provenance
+on every claim. It never saves the profile, edits `context/` or touches memory:
+the owner reviews and saves the draft with `fortytwo onboard`
+([installer](./installer.md#owner-onboarding)).
 
 ## Compatibility
 

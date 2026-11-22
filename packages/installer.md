@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`** — the install-time alias; with no verb it runs `init`.
 - **`fortytwo`** — the everyday lifecycle alias.
 
-- **Version:** `1.0.8` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.1.0` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -52,14 +52,15 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | Verb | What it does |
 |------|--------------|
 | `start` | Run fortytwo in the foreground: load the project `.env` (process env wins over it), start every installed and configured service, prefix and forward their logs, stop them all on Ctrl+C/SIGTERM. Never daemonizes or restarts — the surrounding service manager owns that. |
-| `status` | Show whether fortytwo, the Telegram bridge and the scheduler are running, and whether memory is configured. Exits 0 when running, 3 when not (usable as a health check). |
+| `status` | Show whether fortytwo, the Telegram bridge and the scheduler are running, and whether memory is configured; a `Job tools` line shows the scheduler's MCP entry. Exits 0 when running, 3 when not (usable as a health check). |
 | `stop` | Stop this project's `fortytwo start`. Signals only the process recorded in `.fortytwo/runtime.json`, and only while its heartbeat is fresh **and** its OS process-start identity matches; never looks for processes by name. |
-| `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, copy the skills the built-in schedules call into `.claude/skills/`, ask which built-in schedules to run (`--schedules all|none|<kind,kind>` when non-interactive; stored in `.fortytwo/schedules.json`) and save the owner's time zone when none is saved and it is not UTC (`update` never touches it), provision local infra (embedder model, memory DB migration), record the installed version set. |
+| `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, copy the skills the built-in schedules call into `.claude/skills/`, ask which built-in schedules to run (`--schedules all|none|<kind,kind>` when non-interactive; stored in `.fortytwo/schedules.json`) and save the owner's time zone when none is saved and it is not UTC (`update` never touches it), provision local infra (embedder model, memory DB migration plus the scheduler's `jobs` migration via `runSchedulerMigrations`), record the installed version set. |
 | `pair` | Issue a one-time `/login` pairing code, persisted to the bridge's bindings db (dynamic counterpart of the static `ALLOWED_CHAT_IDS` allowlist). Refuses when Telegram isn't running, unless `--force`. |
-| `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), and whether the optional safety gate is on. |
+| `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), whether the optional safety gate is on, and the scheduler's job tools (see [Scheduler job tools](#scheduler-job-tools)). |
 | `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline, refresh the shipped skills in `.claude/skills/` (a same-named skill you wrote yourself is left alone), then run `doctor`. `--dry-run` reports without installing. |
 | `rollback` | Re-install the previous version set recorded before the last `update`, then run `doctor`. Manual by design — never auto-triggered. |
 | `enrich` | Capture more answers to deepen the persona, then re-render (no clobber). |
+| `onboard` | Review and save the owner profile drafted by persona's `onboarding` skill (see [Owner onboarding](#owner-onboarding)). Shows each change with its source and saves only what the owner confirms in a terminal. `--dry-run` only shows; `--draft <path>` reviews another file. |
 | `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until` — previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
 | `unbind` | Revoke a channel binding (un-pair a chat / drop it from the allowlist). |
 | `gate` | Show or change the optional safety gate: `gate on` holds outward and destructive actions for approval, `gate off` removes it. Off by default; restart Fortytwo to apply. See [The safety gate](#the-safety-gate-optional). |
@@ -74,12 +75,12 @@ peer resolution:
 ```jsonc
 "fortytwo": {
   "compat": {
-    "@justfortytwo/memory": "1.0.1",
+    "@justfortytwo/memory": "2.0.0",
     "@justfortytwo/gate": "^1.0.0",
-    "@justfortytwo/persona": "1.0.2",
-    "@justfortytwo/telegram": "1.0.3",
-    "@justfortytwo/scheduler": "1.0.6",
-    "@justfortytwo/transcript": "^1.0.0"
+    "@justfortytwo/persona": "1.1.0",
+    "@justfortytwo/telegram": "1.1.0",
+    "@justfortytwo/scheduler": "2.0.0",
+    "@justfortytwo/transcript": "^1.0.1"
   }
 }
 ```
@@ -131,7 +132,7 @@ owner's to tune and are never overwritten:
 
 | File | What it decides |
 |---|---|
-| `.claude/policy/capabilities.toml` | Which tools run on their own: reading, files in the project, skills and fortytwo's memory. Everything else, including any tool not listed, is held. |
+| `.claude/policy/capabilities.toml` | Which tools run on their own: reading, files in the project, skills, fortytwo's memory, and listing and creating reminders (`mcp__fortytwo-scheduler__list_jobs` and `__enqueue_job` are `internal`). Cancelling a reminder (`__cancel_job`, `irreversible`) waits for approval. Everything else, including any tool not listed, is held. A manifest written before the job tools existed holds them; `doctor` names the lines to add. |
 | `rules/bash-allowlist.jsonl` | The Bash commands that run without asking (`pwd`, `date`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`). Every other command is held, and so is any command containing `;` `&` `\|` `<` `>` or a substitution. git is left out on purpose. |
 
 The shipped manifest guards the policy files, `.claude/settings.json`,
@@ -205,6 +206,20 @@ no `ollama` CLI needed on the installer's machine) and `doctor` verifies it.
 `--ollama-base-url` (or the interactive question) threads the endpoint into
 both `.env` and the memory server's `.mcp.json` entry.
 
+## Scheduler job tools
+
+When the installed `@justfortytwo/scheduler` ships `fortytwo-scheduler-mcp`,
+`init` and `update` also write a `fortytwo-scheduler` entry in `.mcp.json`
+(`npx -y -p @justfortytwo/scheduler fortytwo-scheduler-mcp`, same `DB_PATH` as
+memory, other env keys kept): the assistant's `enqueue_job` / `list_jobs` /
+`cancel_job` tools (see [scheduler](./scheduler.md#agent-job-tools)). A
+scheduler without that bin gets no entry, and an entry this CLI wrote earlier is
+removed. `status` shows a `Job tools` line; `status` and `doctor` warn when the
+entry is missing, points at a different database than memory, or is held by the
+safety gate. The agent is told to use these tools by persona's
+`context/INDEX.md`, which an existing install receives on the next
+`fortytwo init`.
+
 ## MCP extensions and the transcript
 
 When `@justfortytwo/transcript` is installed, `init` and `update` wire it into
@@ -262,6 +277,30 @@ Output reports `moved N chat row(s) from memory to the transcript` when rows
 moved. A failed migration (a malformed legacy row, a busy database) does not
 abort `init` or `update`: it reports `chat migration skipped: <reason>`, memory
 stays intact, and the next `init` or `update` retries it.
+
+## Owner onboarding
+
+`init` asks fixed questions. For a richer profile the owner asks the assistant
+to run persona's `onboarding` skill; it writes only a draft,
+`.fortytwo/onboarding/draft.json`. `fortytwo onboard` is the only writer of the
+result:
+
+- It shows what would change, with where each claim came from, and saves
+  **nothing without confirmation in a terminal** (there is no `--yes`): the
+  draft was distilled from fetched and uploaded content, so an injected
+  instruction must never be able to save itself. Untrusted text is escaped on
+  the terminal, and markdown structure and invisible characters are rejected.
+- **Summary** claims (role, positioning, values, voice, …) go to the answers
+  in `.fortytwo/identity.json`, then the persona is re-rendered; captured files
+  the owner already has are kept.
+- **Deep-profile facts** go to memory, one fact per row, tagged
+  `owner-profile`, with provenance (source `link`, `upload`, `test` or
+  `interview`, the URL or file name, the date, observed or inferred). A changed
+  fact supersedes its previous row. `fortytwo forget --tag owner-profile`
+  removes them.
+- A re-run proposes only the differences; nothing saved is removed. When
+  memory cannot be reached, the summary is saved and the facts stay in the
+  draft for the next run.
 
 ## Oneiros installation and upgrades
 
