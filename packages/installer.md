@@ -146,8 +146,9 @@ action; `TELEGRAM_APPROVALS=0` keeps that off. With a hook wired by hand, ask
 for it with `fortytwo start --telegram-approvals`.
 
 Limits: the hook applies to every Claude Code session started in the project
-folder; a held action in a scheduled run is not shown anywhere and is cleared
-with `npx fortytwo-gate list` / `approve <id>`; a change applies after a restart.
+folder; a scheduled run stopped by a held action sends a notice naming it
+(scheduler 1.0.7+), and the action is cleared with `npx fortytwo-gate list` /
+`approve <id>`; a change applies after a restart.
 
 ## Passing arguments to Claude Code
 
