@@ -6,7 +6,7 @@ free-form provenance and recalls them by meaning (vector search), by keyword
 embeddings from a local Ollama model (or an opt-in remote provider).
 
 It is **persona-agnostic**: a generic memory store and tool surface with no
-chat/persona/approval coupling. It can be used on its own, as a library,
+chat or persona coupling. It can be used on its own, as a library,
 or through `@justfortytwo/installer`, which registers it in your project.
 
 - **Version:** `2.0.0` (the jobs queue moves to the scheduler; see
