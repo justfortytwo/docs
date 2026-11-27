@@ -9,12 +9,12 @@ package is, how it is built, and how it connects to its siblings.
 
 The 1.0 line includes the conversation transcript split; memory 2.0.0 and
 scheduler 2.0.0 move the jobs queue from memory to the scheduler. Versions
-below are the current releases on npm.
+below are the latest releases on each package's main branch.
 
 | Package | Version | Role |
 |---------|---------|------|
-| [`@justfortytwo/installer`](./installer.md) | `1.2.0` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
-| [`@justfortytwo/persona`](./persona.md) | `1.1.0` | Persona and context templates + Oneiros |
+| [`@justfortytwo/installer`](./installer.md) | `1.3.0` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
+| [`@justfortytwo/persona`](./persona.md) | `1.2.0` | Persona and context templates + Oneiros |
 | [`@justfortytwo/memory`](./memory.md) | `2.0.0` | Durable semantic-memory MCP server |
 | [`@justfortytwo/transcript`](./transcript.md) *(new)* | `1.0.1` | Searchable conversation log, separate from memory |
 | [`@justfortytwo/runner`](./runner.md) | `1.0.1` | Claude Code process/session runtime |

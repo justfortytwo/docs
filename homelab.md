@@ -195,6 +195,34 @@ Your message should appear as `telegram | inbound | owner` and the reply as
 `outbound | assistant`. In a Claude session, the agent searches it with
 `transcript_search` and reads neighbours with `transcript_context`.
 
+## Filling in your profile
+
+`init` asks only the required questions, so most persona fields (bios, voice,
+vocabulary, domain) start empty. To see which ones:
+
+```bash
+podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo enrich'
+```
+
+It lists the empty fields grouped by topic and asks nothing. To fill them, tell
+the assistant "help me fill in my profile", in the web terminal or in Telegram.
+Its onboarding skill asks one topic at a time and writes the answers to the
+draft `.fortytwo/onboarding/draft.json`; nothing is saved yet. Then review and
+save the draft (it asks for a confirmation per change, so it needs `-it`):
+
+```bash
+podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo onboard'
+```
+
+Files under `context/` you already have are kept as they are. A value that
+only appears in such a file (for example
+`context/memory/owner-voice-and-writing.md`) shows up there only after you move
+the file aside and run `npx fortytwo onboard` or `npx fortytwo enrich`, which
+writes it again (keep the old copy: edits you made there are not carried
+over). The "fill the gaps" mode ships in persona 1.2.0, which installer 1.3.0
+installs; an older install gets it by updating to that installer (see
+[Updating](#updating)), which also refreshes `.claude/skills/`.
+
 ## Built-in schedules
 
 The scheduler ships three recurring jobs: a daily briefing, an open-thread
@@ -268,6 +296,25 @@ podman restart claude-code     # reload .mcp.json so the session sees new tools
 If something goes wrong, `npx fortytwo rollback` restores the previous version
 set (single step, manual). It does **not** undo a data migration; restore the
 backup for that.
+
+### Updating the fortytwo CLI
+
+`npx fortytwo update` runs the installer pinned in the project, and it never
+moves that pin: the installer is not in its own compatibility list. Naming the
+installer, as above, runs that version instead; it pins itself into the
+project (`--save-exact`) before it updates the engine. To move the CLI after a
+release without updating anything else, pin it yourself, with the runtime
+stopped:
+
+```bash
+podman exec -it claude-code bash -lc \
+  'cd /workspace && npm install @justfortytwo/installer@<version> --save-exact'
+podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo --version'
+```
+
+The next `npx fortytwo update` then uses that version's compatibility list.
+`update` refuses to run from an installer older than the one pinned in the
+project; use the project's own `npx fortytwo update` then.
 
 ### Updating to memory 2.0 / scheduler 2.0 (installer 1.1.0)
 
@@ -398,8 +445,9 @@ the Telegram token, WAHA keys, `~/.claude` (login/OAuth), the real `.mcp.json`,
 ## Scope
 
 **Covered:** the always-on topology, persistence, embeddings, first install,
-updating (including the move from prereleases to 1.0), and the optional browser
-and WhatsApp services as used in the originating setup.
+filling in the profile, updating (including the CLI itself and the move from
+prereleases to 1.0), and the optional browser and WhatsApp services as used in
+the originating setup.
 
 **Not verified:**
 

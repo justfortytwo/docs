@@ -6,7 +6,7 @@ so the assistant has a name, a voice, owner facts, house rules, and a
 recallable memory corpus, plus the internal **Oneiros** consolidation
 library and prompt. It never ships an owner's real data.
 
-- **Version:** `1.1.0` · **Runtime:** static templates + manifest + compiled
+- **Version:** `1.2.0` · **Runtime:** static templates + manifest + compiled
   Oneiros library (entry `dist/oneiros.js`)
 
 ## What's in here
@@ -116,6 +116,38 @@ correction, and writes only `.fortytwo/onboarding/draft.json`, with provenance
 on every claim. It never saves the profile, edits `context/` or touches memory:
 the owner reviews and saves the draft with `fortytwo onboard`
 ([installer](./installer.md#owner-onboarding)).
+
+### Fill the gaps
+
+Since 1.2.0 the skill also has a **fill the gaps** mode, for an owner who only
+wants the empty persona fields filled. It runs when the owner asks the
+assistant to complete or fill in their profile ("help me fill in my profile",
+which `fortytwo enrich` suggests), in a Claude session or in Telegram:
+
+1. It reads `.fortytwo/identity.json` `answers` (read only) and the field
+   list in persona's `manifest.json`. A field is empty when its value is an
+   empty string, an empty list or missing. If a draft already exists, its
+   `summary` values for fields still empty are shown as "drafted, not saved
+   yet", not offered as new gaps.
+2. It groups the empty fields by topic, the same way `fortytwo enrich` does:
+   the first persona file, in `manifest.json` order, whose template uses the
+   field. `owner_email` and `owner_address` have no placeholder and form a
+   small "contact" topic, listed last.
+3. The owner picks a topic; the skill asks one or two short questions at a
+   time, guided by each field's `prompt`. "skip" leaves a field empty, "stop"
+   ends the questions, and after a topic it offers another one or stops.
+4. Each answer becomes a `summary` entry (`source: "interview"`). The skill
+   shows the draft, then merges it into `.fortytwo/onboarding/draft.json`:
+   existing entries are kept, and only the keys answered now are added or
+   replaced.
+5. The owner saves it with `fortytwo onboard` in a terminal.
+
+**Captured files are kept.** `fortytwo onboard` saves the values to
+`identity.json` and re-renders, but a captured file the owner already has
+(for example `context/memory/owner-voice-and-writing.md`) stays as it is. A
+value that only renders into such a file appears there only after the owner
+moves the file aside and runs `fortytwo onboard` or `fortytwo enrich`, which
+writes it again from the saved answers.
 
 ## Compatibility
 
