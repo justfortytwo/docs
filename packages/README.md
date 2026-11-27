@@ -13,12 +13,12 @@ below are the current releases on npm.
 
 | Package | Version | Role |
 |---------|---------|------|
-| [`@justfortytwo/installer`](./installer.md) | `1.1.2` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
+| [`@justfortytwo/installer`](./installer.md) | `1.2.0` | Bootstrap and lifecycle CLI (`create-fortytwo` / `fortytwo`) |
 | [`@justfortytwo/persona`](./persona.md) | `1.1.0` | Persona and context templates + Oneiros |
 | [`@justfortytwo/memory`](./memory.md) | `2.0.0` | Durable semantic-memory MCP server |
 | [`@justfortytwo/transcript`](./transcript.md) *(new)* | `1.0.1` | Searchable conversation log, separate from memory |
 | [`@justfortytwo/runner`](./runner.md) | `1.0.1` | Claude Code process/session runtime |
-| [`@justfortytwo/scheduler`](./scheduler.md) | `2.1.1` | Durable scheduling and proactive jobs |
+| [`@justfortytwo/scheduler`](./scheduler.md) | `2.1.2` | Durable scheduling and proactive jobs |
 | [`@justfortytwo/telegram`](./telegram.md) | `1.2.0` | Telegram transport/channel adapter |
-| [`@justfortytwo/gate`](./gate.md) | `1.0.0` | Optional safety/policy enforcement |
+| [`@justfortytwo/gate`](./gate.md) | `1.0.1` | Optional safety/policy enforcement |
 | [`@justfortytwo/salience`](./salience.md) | `0.1.1` | Optional model-driven salience extraction |

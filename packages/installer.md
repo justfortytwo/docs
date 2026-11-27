@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`**: the install-time alias; with no verb it runs `init`.
 - **`fortytwo`**: the everyday lifecycle alias.
 
-- **Version:** `1.1.4` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.2.0` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -59,7 +59,7 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), whether the optional safety gate is on, the scheduler's job tools (see [Scheduler job tools](#scheduler-job-tools)), and a warn-only scheduler daemon check (its heartbeat file `scheduler.heartbeat` next to the DB, stale after 90 s). |
 | `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline and run `doctor`. When that passes it reconciles (refreshes the shipped skills in `.claude/skills/`, leaving a same-named skill you wrote yourself alone; re-wires `.mcp.json`; Oneiros; chat migration) and runs `doctor` again. When nothing changed it only reconciles. Refuses while `fortytwo start` or a scheduler with a fresh heartbeat is running, and when the project's installer is newer than the one invoked; otherwise pins the invoked installer into the project with `--save-exact` when it differs. `--dry-run` (`-n`) reports without installing. |
 | `rollback` | Re-install the previous version set recorded before the last `update`, then run `doctor`. Manual by design, never auto-triggered. |
-| `enrich` | Not implemented yet: the command exits with an error. |
+| `enrich` | Ask for the persona fields that are still empty (mostly the optional ones `init` skips), one at a time: Enter skips a field, a line with only `.` (or Ctrl+D) stops and saves, Ctrl+C cancels and saves nothing. Saves the answers to `.fortytwo/identity.json`, prints what changed and re-renders the persona (managed files rewritten, files you already have under `context/` kept). For each changed answer it names the kept files that use it; move one aside and run `fortytwo enrich` again to regenerate it. `--all` also asks for fields that have a value (Enter keeps it); `--answers <file.json>` reads the values without prompting. Without a terminal and without `--answers` it exits 2, as it does when `.fortytwo/identity.json` or the persona is missing. Values the assistant drafted from links and uploads go through `onboard` instead, which confirms each one and records its source. |
 | `onboard` | Review and save the owner profile drafted by persona's `onboarding` skill (see [Owner onboarding](#owner-onboarding)). Shows each change with its source and saves only what the owner confirms in a terminal. `--dry-run` only shows; `--draft <path>` reviews another file. |
 | `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until`, previewed and confirmed (or `--yes`). `--limit` caps matches (default 50); `--db-path` picks the DB. Owner-only: deletes via the memory library API, never exposed to the assistant. |
 | `unbind` | Revoke a chat (`--chat-id <id>` or `--all`, optionally `--channel <name>`). It removes the chat from the bridge's bindings db, so a chat paired with `fortytwo pair` is refused from its next message without a restart, and from `.fortytwo/identity.json`. `--all` also cancels pairing codes that have not been used yet. It does not edit `.env`: an id still in `ALLOWED_CHAT_IDS` keeps access, and unbind names it so you can remove it there and restart. |
@@ -87,7 +87,7 @@ peer resolution:
     "@justfortytwo/gate": "^1.0.0",
     "@justfortytwo/persona": "1.1.0",
     "@justfortytwo/telegram": "1.2.0",
-    "@justfortytwo/scheduler": "2.1.1",
+    "@justfortytwo/scheduler": "2.1.2",
     "@justfortytwo/transcript": "^1.0.1"
   }
 }

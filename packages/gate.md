@@ -7,7 +7,7 @@ It is **fail-closed**: any error while deciding a PreToolUse call is denied. A
 hook event that is empty, unparseable or not PreToolUse is allowed, because
 there is no tool call to gate.
 
-- **Version:** `1.0.0` · **Runtime:** Claude Code plugin, PreToolUse hook, or
+- **Version:** `1.0.1` · **Runtime:** Claude Code plugin, PreToolUse hook, or
   plain library · **Node:** >= 18 · **Leaf package**: no `@justfortytwo/*`
   peers, no database, no network
 
@@ -160,10 +160,10 @@ directory; without it, the hook event's `cwd`.
 ## File formats
 
 **Manifest** (TOML, see `examples/capabilities.toml`): `default_tier`
-(recommended `external`). A manifest without `default_tier` falls back to
-`internal`, an auto-allow tier, so unlisted tools pass; the shipped manifests
-set `external`. `[tiers]` exact tool name → tier plus trailing-`*`
-prefix globs; `[bash]` regex patterns that only ever **elevate** Bash (and
+(recommended `external`). A manifest without `default_tier`, or with an invalid
+value, falls back to `external`, so unlisted tools are held for approval; the
+shipped manifests set `external` explicitly. `[tiers]` exact tool name → tier plus trailing-`*`
+prefix globs (an invalid tier value also falls back to `external`); `[bash]` regex patterns that only ever **elevate** Bash (and
 double as the denylist, highest match wins); `[guard].files` lists project-relative
 paths whose edit is `irreversible` (point at the manifest, settings and
 allowlist so the gate can't be silently weakened). An entry ending in `/`

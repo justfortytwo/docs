@@ -9,7 +9,7 @@ The design rationale (durable jobs, token gating, crash safety, event hooks)
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
-- **Version:** `2.1.1` · **Runtime:** standalone daemon, `bin` is
+- **Version:** `2.1.2` · **Runtime:** standalone daemon, `bin` is
   `fortytwo-scheduler`; second `bin` `fortytwo-scheduler-mcp` (stdio MCP) ·
   **Node:** >= 20
 
