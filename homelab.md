@@ -264,6 +264,26 @@ are kept as they are.
   captured files you edited are kept).
 - Approvals still pending at the upgrade are announced once more.
 
+### Starting a fresh chat session
+
+The bridge resumes each chat's Claude session after a restart, history
+included. A changed instruction (for example the Telegram output note in
+telegram 1.2.0) can lose to a long history that does the opposite. The bridge
+has no command for a new session; clear the stored ids with the bridge stopped,
+or it writes them back:
+
+```sh
+podman stop fortytwo
+podman exec claude-code bash -lc 'cd /workspace/state &&
+  cp bridge-state.json bridge-state.json.bak &&
+  node -e "const fs=require(\"fs\"),f=\"bridge-state.json\",s=JSON.parse(fs.readFileSync(f));s.sessions={};fs.writeFileSync(f,JSON.stringify(s,null,2))" &&
+  grep -A1 sessions bridge-state.json'   # must show "sessions": {}
+podman start fortytwo
+```
+
+The next message starts a new session. Memory, the transcript and queued jobs
+are unaffected; only the chat's in-session context is lost.
+
 ### Updating from a pre-1.0 installation
 
 A project's pinned CLI only knows the version set it shipped with, so

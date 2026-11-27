@@ -282,6 +282,13 @@ actor `assistant` and kind = the notification kind.
   journal entries then are not recorded) if it is missing or fails.
 - **Fire-and-forget.** `makeJournalWrite` never propagates failures, so a
   broken transcript cannot affect the job or other notifiers.
+- **Output notes** (scheduler 2.1.0+). A channel wired at boot can add a note
+  to the system prompt of scheduled runs (`DaemonOptions.appendSystemPrompt`,
+  passed as `--append-system-prompt`). Telegram adds one: no Markdown tables,
+  compact lists instead. It is added only when the Telegram notifier is
+  actually wired, so journal-only installs and other channels are unaffected.
+  An operator `--append-system-prompt` is kept, with the note added after it.
+  The Oneiros worker never receives it.
 - The `learn_review` gate (`recentCount`) counts memory rows from the last
   7 days. With chat and notifications gone from memory it counts facts only,
   so it fires less often; this is accepted as is.
