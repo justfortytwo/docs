@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`**: the install-time alias; with no verb it runs `init`.
 - **`fortytwo`**: the everyday lifecycle alias.
 
-- **Version:** `1.1.3` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.1.4` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
