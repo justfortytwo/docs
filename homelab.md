@@ -105,6 +105,17 @@ identifies that process by PID and PID namespace. The runtime lives in the
 `fortytwo` container, so run `pair` there. From `claude-code` it reports
 "Telegram is not running"; `npx fortytwo pair --force` there is the fallback.
 
+`status` has the same limit. Run it in the `fortytwo` container:
+
+```bash
+podman exec -it fortytwo bash -lc 'cd /workspace && npx fortytwo status'
+```
+
+From `claude-code` it reports Fortytwo and Telegram as not running even when
+they are up, because the runtime's PID belongs to the other container. Its
+Scheduler line is still accurate there, since the heartbeat file sits in the
+shared `db/` folder.
+
 ### What `init` does
 
 1. Installs the engine packages that are missing (`gate`, `memory`, `persona`,
