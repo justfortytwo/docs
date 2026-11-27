@@ -146,8 +146,8 @@ which `fortytwo enrich` suggests), in a Claude session or in Telegram:
 `identity.json` and re-renders, but a captured file the owner already has
 (for example `context/memory/owner-voice-and-writing.md`) stays as it is. A
 value that only renders into such a file appears there only after the owner
-moves the file aside and runs `fortytwo onboard` or `fortytwo enrich`, which
-writes it again from the saved answers.
+moves the file aside and runs `fortytwo enrich` (or `fortytwo onboard` while a
+draft is waiting), which writes it again from the saved answers.
 
 ## Compatibility
 

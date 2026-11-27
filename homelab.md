@@ -217,8 +217,8 @@ podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo onboard'
 Files under `context/` you already have are kept as they are. A value that
 only appears in such a file (for example
 `context/memory/owner-voice-and-writing.md`) shows up there only after you move
-the file aside and run `npx fortytwo onboard` or `npx fortytwo enrich`, which
-writes it again (keep the old copy: edits you made there are not carried
+the file aside and run `npx fortytwo enrich` (or `npx fortytwo onboard` while a
+draft is waiting), which writes it again (keep the old copy: edits you made there are not carried
 over). The "fill the gaps" mode ships in persona 1.2.0, which installer 1.3.0
 installs; an older install gets it by updating to that installer (see
 [Updating](#updating)), which also refreshes `.claude/skills/`.
