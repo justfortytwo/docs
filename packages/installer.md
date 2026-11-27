@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`**: the install-time alias; with no verb it runs `init`.
 - **`fortytwo`**: the everyday lifecycle alias.
 
-- **Version:** `1.1.1` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.1.2` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -87,7 +87,7 @@ peer resolution:
     "@justfortytwo/gate": "^1.0.0",
     "@justfortytwo/persona": "1.1.0",
     "@justfortytwo/telegram": "1.2.0",
-    "@justfortytwo/scheduler": "2.1.0",
+    "@justfortytwo/scheduler": "2.1.1",
     "@justfortytwo/transcript": "^1.0.1"
   }
 }

@@ -9,7 +9,7 @@ The design rationale (durable jobs, token gating, crash safety, event hooks)
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
-- **Version:** `2.1.0` · **Runtime:** standalone daemon, `bin` is
+- **Version:** `2.1.1` · **Runtime:** standalone daemon, `bin` is
   `fortytwo-scheduler`; second `bin` `fortytwo-scheduler-mcp` (stdio MCP) ·
   **Node:** >= 20
 
@@ -88,9 +88,11 @@ Exports: `enqueue`, `claimDue`, `complete`, `fail`, `listActive`,
 - `countPendingApprovals` (the `sweep` gate) stays in memory, which owns the
   `approvals` table.
 - **Retries.** A job whose run or gate throws is retried after 1 min, then
-  5 min; the third failure marks it `failed` with `last_error`
-  (`MAX_ATTEMPTS = 3`) and sends no notification. This applies to recurring
-  rows too; a built-in kind gets a fresh row at the next boot. At boot,
+  5 min (`MAX_ATTEMPTS = 3`). On the third failure a one-off becomes `failed`
+  with `last_error`; a recurring row keeps `last_error`, resets `attempts` and
+  moves to its next slot (since 2.1.1; before, it became `failed` until the
+  next boot). No notification is sent. A run with no Claude result (timed out
+  or unparseable) counts as a failure. At boot,
   `running` rows older than 15 min (`STALE_RUNNING_MS`) go back to `pending`.
 
 ## Job kinds (as built)
@@ -262,6 +264,7 @@ supervises it together with the Telegram bridge.
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DB_PATH` | recommended | path to the database (default `fortytwo.db` in the working directory); the heartbeat is written next to it |
+| `FORTYTWO_TURN_TIMEOUT` | no | time limit in seconds for each scheduled `claude` turn (default `300`, since 2.1.1) |
 | `EMBED_MODEL` | recommended | Ollama embedding model (falls back to FakeEmbedder) |
 | `OLLAMA_BASE_URL` | no | default `http://localhost:11434` |
 | `CLAUDE_BIN` | no | `claude` CLI path the runner spawns (default: `claude` on `PATH`) |
@@ -272,9 +275,12 @@ supervises it together with the Telegram bridge.
 | `CLAUDE_CONFIG_DIR` | no | Claude Code config dir, checked for user-level skills (default `~/.claude`) |
 | `TELEGRAM_BINDINGS_DB` | no | bindings db path relative to the root (default `state/telegram-bindings.db`); must match the bridge |
 
-Scheduled turns have no timeout: the daemon creates its runner without one,
-and `FORTYTWO_TURN_TIMEOUT` is not read. Only the Oneiros worker is capped, at
-120 s.
+Since scheduler 2.1.1 the daemon stops a scheduled turn after
+`FORTYTWO_TURN_TIMEOUT` seconds (default 300). A turn that ends with no Claude
+result, because it timed out or its output was not a result, fails the job
+into the normal retry. A value that is not a whole number of seconds from 1 to
+2147483 stops the daemon at boot. The Oneiros worker keeps its own 120 s limit.
+Before 2.1.1 the variable was not read and scheduled turns had no limit.
 
 ### Liveness
 

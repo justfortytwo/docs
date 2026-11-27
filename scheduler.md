@@ -351,8 +351,8 @@ interactive messages.
 - **Failures.** Increment `attempts`, store `last_error`, and retry with a fixed
   MVP schedule. The design had **3 attempts** at 1 min → 5 min → 30 min and a
   note to the conversation log after the cap. As built, a job is retried after
-  **1 min**, then **5 min**; the third failure marks the row `failed` and
-  sends no notification. The 30 min step is used only by the approval outbox.
+  **1 min**, then **5 min**; on the third failure a one-off becomes `failed`
+  and a recurring row skips to its next slot (2.1.1). No notification is sent. The 30 min step is used only by the approval outbox.
   (A tunable backoff policy is deferred.)
 - **Serialized turns.** p-queue concurrency 1 keeps LLM turns from overlapping.
 
