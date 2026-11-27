@@ -93,9 +93,6 @@ checking relative links. The build warns about broken links.
 
 ## Gotchas
 
-- `scheduler.md` links to `./design-principles.md`, which **does not exist**
-  in this repo yet. Don't assume it does; create it or fix the link only if
-  asked.
 - `scheduler.md` is a design record: it still labels `scheduler` and `runner`
   *(new)* and describes the bridge's old `schedulerLoop`/`SCHEDULES`. Shipped
   behavior is in `packages/scheduler.md`; `../scheduler` and `../runner` are

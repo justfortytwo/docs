@@ -1,9 +1,8 @@
 # Scheduler & Durable Jobs
 
 This is the design for fortytwo's **scheduler**, the subsystem that runs work on a
-clock and on demand without a human in the loop. It implements two spine items
-from [Design Principles](./design-principles.md): **durable jobs** and **Pulse**
-(proactive wakes). It replaced the proactive-wake loop that used to live inside
+clock and on demand without a human in the loop. It implements two of
+fortytwo's spine items: **durable jobs** and **Pulse** (proactive wakes). It replaced the proactive-wake loop that used to live inside
 the Telegram bridge. This is the design record; the shipped behavior of the
 package is in [`packages/scheduler.md`](./packages/scheduler.md).
 

@@ -47,3 +47,11 @@ supporting components.
   enforcement layer.
 - [`@justfortytwo/salience`](./packages/salience.md): optional model-driven
   salience extraction.
+
+## License
+
+MIT © 2026 Enrico Deleo
+
+---
+
+Created and maintained by [**Enrico Deleo**](https://enricodeleo.com).
