@@ -326,8 +326,9 @@ actor `assistant` and kind = the notification kind.
 - `@modelcontextprotocol/sdk` (`^1.32.2`): the `fortytwo-scheduler-mcp` server.
 - `croner` (`^10.0.0`): next-run computation for crons.
 - `p-queue` (`^9.0.0`): the concurrency-1 run queue.
-- `@justfortytwo/persona` (pinned `1.0.2`): Oneiros `hasWork`/`refine`/
-  `workerPrompt`.
+- `@justfortytwo/persona` (`^1.0.2`, a caret range since 2.1.2, so the
+  installer's persona is shared instead of nested): Oneiros
+  `hasWork`/`refine`/`workerPrompt`.
 - `@justfortytwo/telegram` (`^0.1.5 || ^1.0.0`): **optional peer**; enables
   the Telegram notifier.
 - `@justfortytwo/transcript` (`^1.0.0`): **optional peer**; receives journal

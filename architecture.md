@@ -133,8 +133,9 @@ agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP
   the scheduler daemon is the single writer of the `running` transition.
 - **No scheduler↔telegram coupling.** Both depend on `runner`; neither requires
   the other (each is an optional peer of the other). The scheduler also
-  depends on `memory` and `persona` (Oneiros); telegram depends on `gate`. telegram loads the scheduler's job API lazily (an optional peer)
-  to queue undelivered replies, and drops them when it is absent.
+  depends on `memory` and `persona` (Oneiros); telegram depends on `gate`.
+  telegram loads the scheduler's job API lazily (an optional peer) to queue
+  undelivered replies, and drops them when it is absent.
 - **Memory produces no jobs.** The scheduler owns the `jobs` table and job API;
   memory's staged approvals are an outbox the scheduler polls.
 
