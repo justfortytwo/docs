@@ -284,11 +284,11 @@ actor `assistant` and kind = the notification kind.
   broken transcript cannot affect the job or other notifiers.
 - **Output notes** (scheduler 2.1.0+). A channel wired at boot can add a note
   to the system prompt of scheduled runs (`DaemonOptions.appendSystemPrompt`,
-  passed as `--append-system-prompt`). Telegram adds one: no Markdown tables,
-  compact lists instead. It is added only when the Telegram notifier is
-  actually wired, so journal-only installs and other channels are unaffected.
-  An operator `--append-system-prompt` is kept, with the note added after it.
-  The Oneiros worker never receives it.
+  passed as `--append-system-prompt`). Telegram adds one that asks for compact
+  lists instead of Markdown tables. The bin adds it only when it wires the
+  Telegram notifier, so journal-only installs and other channels run without
+  it. If the operator sets `--append-system-prompt`, the daemon keeps that value
+  and adds the note after it. The Oneiros worker never receives the note.
 - The `learn_review` gate (`recentCount`) counts memory rows from the last
   7 days. With chat and notifications gone from memory it counts facts only,
   so it fires less often; this is accepted as is.

@@ -163,8 +163,8 @@ The arguments travel to the services as `FORTYTWO_CLAUDE_ARGS`, a JSON array of
 strings. To make them permanent, set that variable in `.env` instead
 (`FORTYTWO_CLAUDE_ARGS=["--chrome"]`); the command line wins over it, and a bare
 `--` passes none. `--input-format` and `--output-format` are refused, because
-fortytwo sets them itself. A `--append-system-prompt` value is kept: the bridge
-and the scheduler add their Telegram output note after it. The
+fortytwo sets them itself. If you pass `--append-system-prompt`, the bridge and
+the scheduler keep your value and add their Telegram output note after it. The
 memory-consolidation worker (Oneiros) runs locked down and never receives these
 arguments.
 

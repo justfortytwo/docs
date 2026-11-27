@@ -81,12 +81,14 @@ configuration and receives `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` explicitly,
 without changing `process.env`. Persistent sessions have no default
 wall-clock turn timeout.
 
-Every session also gets an output note through `--append-system-prompt`
-(telegram 1.2.0+): Telegram does not render Markdown tables, so chat replies
-use compact lists instead; files are unaffected. An operator
-`--append-system-prompt` in `FORTYTWO_CLAUDE_ARGS` is kept, with the note added
-after it. A resumed session keeps its history: if earlier replies used tables,
-the model may keep doing so until the chat starts a new session.
+Since telegram 1.2.0 the bridge passes every session an output note through
+`--append-system-prompt`. Telegram does not render Markdown tables, so the note
+asks Claude for compact lists in chat replies; files it writes are not
+affected. If the operator sets `--append-system-prompt` in
+`FORTYTWO_CLAUDE_ARGS`, the bridge keeps that value and adds the note after it.
+A resumed session keeps its history, and Claude may keep answering with tables
+if earlier replies used them; starting a new session fixes it (see the homelab
+guide).
 
 Claude stays alive between messages. When runner exposes a session ID, the
 bridge writes it to `sessions` in `state/bridge-state.json`. After a bridge

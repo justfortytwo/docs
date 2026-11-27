@@ -267,10 +267,10 @@ are kept as they are.
 ### Starting a fresh chat session
 
 The bridge resumes each chat's Claude session after a restart, history
-included. A changed instruction (for example the Telegram output note in
-telegram 1.2.0) can lose to a long history that does the opposite. The bridge
-has no command for a new session; clear the stored ids with the bridge stopped,
-or it writes them back:
+included. Claude can follow that history over a changed instruction: after the
+Telegram output note arrived in telegram 1.2.0, a long session full of tables
+kept replying with tables. The bridge has no command for a new session, so stop
+it and clear the stored ids yourself (a running bridge writes them back):
 
 ```sh
 podman stop fortytwo
@@ -281,8 +281,8 @@ podman exec claude-code bash -lc 'cd /workspace/state &&
 podman start fortytwo
 ```
 
-The next message starts a new session. Memory, the transcript and queued jobs
-are unaffected; only the chat's in-session context is lost.
+The next message starts a new session. You lose the chat's in-session context;
+memory, the transcript and queued jobs stay as they were.
 
 ### Updating from a pre-1.0 installation
 
