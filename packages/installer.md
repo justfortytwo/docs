@@ -324,7 +324,7 @@ asks one topic at a time and merges the answers into the same draft (see
 [persona](./persona.md#onboarding)), and `fortytwo onboard` saves them as
 above. A value that renders only into a captured file the owner already has
 appears there only after the owner moves that file aside and runs `fortytwo
-onboard` or `fortytwo enrich`, which writes it again.
+enrich` (or `fortytwo onboard` while a draft is waiting), which writes it again.
 
 ## Oneiros installation and upgrades
 
