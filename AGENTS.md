@@ -99,9 +99,9 @@ checking relative links. The build warns about broken links.
 - `scheduler.md` is a design record: it still labels `scheduler` and `runner`
   *(new)* and describes the bridge's old `schedulerLoop`/`SCHEDULES`. Shipped
   behavior is in `packages/scheduler.md`; `../scheduler` and `../runner` are
-  the source of truth. When
-  documenting current behavior, verify against the sibling package source
-  rather than trusting this doc; when editing, keep it framed as a design doc.
+  the source of truth. When documenting current behavior, verify against the
+  sibling package source rather than trusting this doc; when editing, keep it
+  framed as a design doc.
 - Don't move package install/config instructions here. They belong in each
   package's README.
 - Don't invent decisions: this repo is the record of agreed design. Mark open

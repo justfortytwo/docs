@@ -125,8 +125,8 @@ its second evidence stream (see [persona](./persona.md#oneiros)).
 
 ## Migration
 
-Existing installs hold chat in `memories`. The installer moves it once, and
-safely to re-run (details in [installer](./installer.md#chat-migration)):
+Existing installs hold chat in `memories`. The installer moves it once, and the
+move is safe to re-run (details in [installer](./installer.md#chat-migration)):
 
 - `telegram:*` and `scheduler:wake` rows are mapped to transcript rows with
   their timestamps and meta preserved, `legacy_memory_id` set to the old
@@ -135,10 +135,10 @@ safely to re-run (details in [installer](./installer.md#chat-migration)):
 - Mapping: Telegram rows take actor, direction and kind from `source` and
   `meta`, thread id from `meta.thread_id` (null if absent). Scheduler rows
   become channel `scheduler`, outbound, kind = the second tag.
-- Counts are verified before anything is removed from memory; removal uses the
-  owner-privileged `deleteByIds`, in one transaction.
-- Persona's transcript cursor is initialized so Oneiros neither reprocesses
-  consumed history nor skips unconsumed messages.
+- The installer verifies counts before it removes anything from memory;
+  removal uses the owner-privileged `deleteByIds`, in one transaction.
+- The installer initializes persona's transcript cursor so Oneiros neither
+  reprocesses consumed history nor skips unconsumed messages.
 
 ## Consequences
 
@@ -146,8 +146,8 @@ safely to re-run (details in [installer](./installer.md#chat-migration)):
   move it fires less often (kept as is).
 - transcript requires memory to be installed (plumbing dependency).
 - The transcript grows without bound and has no delete path.
-- If `append` fails, the caller logs and continues; a reply is never blocked
-  or failed by it. There is no retry queue in the first version.
+- If `append` fails, the caller logs and continues; the failure never blocks
+  or fails a reply. There is no retry queue in the first version.
 
 ## Testing
 

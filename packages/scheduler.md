@@ -9,7 +9,7 @@ The design rationale (durable jobs, token gating, crash safety, event hooks)
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
-- **Version:** `2.0.0` · **Runtime:** standalone daemon, `bin` is
+- **Version:** `2.1.0` · **Runtime:** standalone daemon, `bin` is
   `fortytwo-scheduler`; second `bin` `fortytwo-scheduler-mcp` (stdio MCP) ·
   **Node:** >= 20
 
@@ -112,13 +112,13 @@ install. `fortytwo init` asks about each one (or takes
 The daemon reads it once at boot. A job that is off has its active recurring
 row retired (status `done`, not rescheduled; one-off rows of the same kind are
 untouched). Switching it back on inserts a **fresh** row at the next boot; the
-old `done` row stays in the table. A kind that is not
-listed is on, and so is every kind when the file is missing, so installs that
-predate the file are unchanged. A file that exists but cannot be understood (bad JSON, a
-non-boolean `enabled`, an unusable `timezone`) stops the daemon with an error;
-it never falls back to "everything on" or to UTC. Restart Fortytwo after a
-change. On an existing install, change the choice with `fortytwo schedules` (it
-touches only this file).
+old `done` row stays in the table. A kind that is not listed is on, and so is
+every kind when the file is missing, so installs that predate the file are
+unchanged. A file that exists but cannot be understood (bad JSON, a non-boolean
+`enabled`, an unusable `timezone`) stops the daemon with an error; it never
+falls back to "everything on" or to UTC. Restart Fortytwo after a change. On an
+existing install, change the choice with `fortytwo schedules` (it touches only
+this file).
 
 ### Time zone
 
@@ -193,8 +193,8 @@ Rules (`src/agent-jobs.ts`):
   Oneiros and the built-in recurring kinds are system-owned: the agent can
   neither create nor cancel them.
 - **Payload:** exactly `{ "text": "..." }`, one line, 1 to 500 characters. It
-  reaches a prompt as `Reminder: <text>`, so it is treated as untrusted: other
-  keys, newlines and control characters are rejected.
+  reaches a prompt as `Reminder: <text>`, so the server treats it as untrusted
+  and rejects other keys, newlines and control characters.
 - **`run_at`:** ISO-8601 with `Z` or an offset, or without one plus `timezone`
   (IANA); stored as UTC. Malformed values and times in the past are rejected.
 - **`recurrence`:** a cron read in the install time zone, at most once an hour.
@@ -218,10 +218,10 @@ are added; `fortytwo doctor` names them.
 
 ## Oneiros maintenance
 
-`persona.oneiros` runs daily at `17 3 * * *` (in the configured time zone, UTC by default) with null payload and the
-existing durable retry/claim mechanism. The installer seeds it after
-initializing persona's checkpoint; daemon boot reconciles the same job when
-the checkpoint exists. The cheap gate checks both evidence heads: the memory
+`persona.oneiros` runs daily at `17 3 * * *` (in the configured time zone, UTC
+by default) with null payload and the existing durable retry/claim mechanism.
+The installer seeds it after initializing persona's checkpoint; daemon boot
+reconciles the same job when the checkpoint exists. The cheap gate checks both evidence heads: the memory
 head and, when `@justfortytwo/transcript` loads, the transcript head
 (`loadTranscriptSource` in `src/oneiros.ts` adapts `transcriptHead` /
 `transcriptDelta`). Without transcript only the memory stream runs.

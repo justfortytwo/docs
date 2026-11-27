@@ -1,10 +1,10 @@
 # `@justfortytwo/telegram`
 
 The **Telegram channel adapter** for fortytwo: a standalone, always-on
-**bridge** connecting a Telegram bot to persistent Claude Code sessions through
+bridge connecting a Telegram bot to persistent Claude Code sessions through
 `@justfortytwo/runner`.
 
-- **Version:** `1.1.0` · **Runtime:** long-running bridge, `bin` is
+- **Version:** `1.2.0` · **Runtime:** long-running bridge, `bin` is
   `fortytwo-telegram-bridge` · **Node:** >= 20
 
 ## Why this exists
@@ -21,9 +21,9 @@ lifecycle entirely to runner; it makes no provider or model decisions.
    conversation logging, input waits only for `session.send()` to write it.
    Polling continues while Claude works; another message goes to the same session
    immediately after preprocessing.
-2. **Output and deferrals.** Complete assistant-message events are coalesced
-   into an evolving Telegram reply, edited at most once per second during
-   streaming. A result finalizes the reply; long replies use additional
+2. **Output and deferrals.** The bridge coalesces complete assistant-message
+   events into an evolving Telegram reply and edits it at most once per second
+   during streaming. A result finalizes the reply; long replies use additional
    messages of at most 4000 UTF-16 units. Typing refreshes while submitted
    inputs await results. Deferred results produce a plain notice: Telegram
    cannot authorize the action. Claude Code owns tool permissions; gate is
@@ -43,21 +43,21 @@ lifecycle entirely to runner; it makes no provider or model decisions.
    the new one (since 1.0.4). Messages the scheduler sent since the owner's
    previous message in that chat (conversation log, channel `scheduler`; at
    most the latest 5, each cut at 3000 characters) are put in front of the
-   next inbound message (since 1.0.5; needs `@justfortytwo/transcript`). Both
-   are marked as context, not as new instructions.
+   next inbound message (since 1.0.5; needs `@justfortytwo/transcript`). The
+   bridge marks both as context, not as new instructions.
 
 ### Attachments
 
-Inbound messages can carry attachments: **photos** (`telegram_photo`),
-**documents** (`telegram_document`), **voice notes** (`telegram_voice`) and
-**audio files** (`telegram_audio`). Each is downloaded within the byte limit,
+Inbound messages can carry attachments: photos (`telegram_photo`), documents
+(`telegram_document`), voice notes (`telegram_voice`) and audio files
+(`telegram_audio`). Each is downloaded within the byte limit,
 stored under the inbox store dir as `<chat>/<message>` with the extension
 derived from the real mime type, and handed to the session as an
 untrusted-content attachment with a gate provenance envelope. Telegram never
-sends a file name for voice notes, and none is invented: when the update
-carries no `file_name`, the stored name comes from the message and file ids,
-as with the other attachment kinds. Files over the download limit are skipped
-and reported.
+sends a file name for voice notes, and the bridge does not invent one: when
+the update carries no `file_name`, the stored name comes from the message and
+file ids, as with the other attachment kinds. The bridge skips files over the
+download limit and reports them.
 
 Limitation: the agent receives the stored file path only; nothing transcribes
 audio yet. Transcription, video and video-note ingestion, and richer handling
@@ -109,7 +109,7 @@ close live RunnerSessions.
 ## Pairing / login binding model
 
 The bot is **locked down**: an unbound sender without a valid `/login` gets
-**no response at all**. Access is earned through a channel-agnostic
+**no response at all**. A chat gets access through a channel-agnostic
 challenge/verify pairing flow:
 
 ```text
@@ -220,7 +220,7 @@ node dist/bridge.js
 
 Run under a restart loop (tmux/systemd), or under `fortytwo start`, which
 supervises it together with the scheduler. Attachments: photo/document
-**captions** are preserved in the same Claude turn as attachment details and
+captions are preserved in the same Claude turn as attachment details and
 in inbound conversation-log text; message text takes precedence when present.
 
 ## Notable API history
@@ -229,6 +229,13 @@ in inbound conversation-log text; message text takes precedence when present.
 change: `approvalKeyboard`, `ApprovalKeyboardOptions`, `formatApprovalCard`
 are gone). Old buttons only report that the control is unsupported; they
 never submit a Claude turn or change approval state.
+
+`1.0.3` brought approval buttons back as an opt-in (`TELEGRAM_APPROVALS`),
+built on the gate's approval store instead of bridge-owned state, with new
+exports `Approvals`, `approvalsEnabled`, `formatApprovalRequest` and
+`ChatSessions.resume()`. Without the setting, the `1.0.0-4` behavior applies.
+
+`1.2.0` adds the Telegram output note (see Session lifecycle and recovery).
 
 ## Testing
 

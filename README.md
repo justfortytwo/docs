@@ -6,7 +6,7 @@
 [package reference](./packages/).
 
 This repository holds the canonical, publishable design and architecture
-documentation for **fortytwo**: the decisions and contracts that span packages
+documentation for fortytwo: the decisions and contracts that span packages
 and outlive any single implementation. Package-specific install and
 configuration docs live in each package's own README.
 

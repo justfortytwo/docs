@@ -1,10 +1,9 @@
 # `@justfortytwo/gate`
 
 A standalone, agent-agnostic **PreToolUse safety gate** for Claude Code. It
-decides, *before any tool runs*, whether a call is safe to auto-run, must be
-**deferred for a one-shot human approval**, or should be **denied outright**.
-It is **fail-closed**: anything unrecognized, and anything that errors, is blocked
-rather than waved through.
+checks each call *before any tool runs*: a safe call auto-runs, a risky one
+waits for a one-shot human approval, and a forbidden one is denied outright. It is **fail-closed**: anything
+unrecognized, and anything that errors, is blocked rather than waved through.
 
 - **Version:** `1.0.0` · **Runtime:** Claude Code plugin, PreToolUse hook, or
   plain library · **Node:** >= 18 · **Leaf package**: no `@justfortytwo/*`
@@ -15,8 +14,7 @@ rather than waved through.
 LLM agents happily run whatever a tool, a web page, or a chat message tells
 them to. A blocklist ("never run `rm -rf`") fails open: anything you didn't
 think of slips through. The gate inverts that: the dangerous **and the
-unknown** both stop and wait for you, while genuinely safe, known operations
-stay fast.
+unknown** both stop and wait for you, while safe, known operations stay fast.
 
 ## Three independent parts
 
@@ -40,8 +38,8 @@ npm install @justfortytwo/gate
 **As a Claude Code plugin (recommended):** the package ships
 `.claude-plugin/plugin.json` and `hooks/hooks.json` wiring a `PreToolUse`
 matcher `"*"` to `dist/gate-hook.js` via `${CLAUDE_PLUGIN_ROOT}`. Plugin hooks
-compose with project/user hooks; the gate adds to, never replaces, existing
-setup.
+compose with project/user hooks; the gate adds to existing setup and does not
+replace it.
 
 **As a hand-wired hook:** add to `.claude/settings.json`:
 
@@ -71,8 +69,8 @@ The hook emits exactly one of `allow`, `deny`, or `defer`:
 ```
 
 `defer` asks the host to **hold the call for a one-shot human approval**; the
-defer → approval → re-fire loop only completes if the host actually pauses on
-that decision. The gate emits the decision; it cannot itself stop a host that
+defer → approval → re-fire loop only completes if the host pauses on that
+decision. The gate emits the decision; it cannot itself stop a host that
 ignores `defer`.
 
 ## How an approval flows
@@ -126,8 +124,8 @@ contributes a SQLite-backed `GateApprovalStore`.
 
 There is also a content-trust policy engine (`decidePolicy`,
 `classifyAuthority`, `canUseAsInstruction`, …) for the *"may this source
-instruct the agent?"* question: the principled trusted/untrusted boundary
-when ingesting web pages, messages, or tool output.
+instruct the agent?"* question: the trusted/untrusted boundary when
+ingesting web pages, messages, or tool output.
 
 ## Configuration
 
@@ -152,9 +150,9 @@ paths whose edit is `irreversible` (point at the manifest, settings and
 allowlist so the gate can't be silently weakened). An entry ending in `/`
 guards everything below that directory; `[guard].outside_project = true` also
 holds edits outside the project root. The guard covers `Write`, `Edit` and
-`NotebookEdit`; a path is checked as written and with symbolic links resolved,
-without regard to letter case, and a relative path is resolved from the
-session's current directory.
+`NotebookEdit`; it checks a path as written and with symbolic links resolved,
+without regard to letter case, and resolves a relative path from the session's
+current directory.
 
 **Bash allowlist** (JSONL, see `examples/bash-allowlist.jsonl`):
 `command_glob` (required, anchored, whole-command), `cwd_glob` (default `*`),

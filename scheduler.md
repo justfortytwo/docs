@@ -16,7 +16,7 @@ Before the scheduler, the proactive-wake scheduler was embedded in the Telegram 
    cannot do anything proactively unless Telegram is up.
 2. **Wakes always spend tokens.** A scheduled wake fires a full LLM turn
    unconditionally: the afternoon "open-thread sweep" runs even when there are
-   zero pending approvals and nothing to report. That is pure waste.
+   zero pending approvals and nothing to report.
 
 And there was no durable **one-off** job queue at all: the deferred-jobs runner
 was never extracted, there was no `jobs` table, and the bridge's `jobLoop` was a
@@ -145,7 +145,7 @@ Each is small and independently testable.
     always runs.
   - `run` does the work: fires an LLM turn via the runner, or does pure work
     (e.g. `reembed_memory`, kept for jobs queued by older installs).
-- **`tick(now)`**: the pure heart of the loop, dependency-injected so it tests
+- **`tick(now)`**: the pure core of the loop, dependency-injected so it tests
   without a network or an LLM. For each claimed-due job: evaluate `hasWork`; if
   false, `complete(skipped)` + reschedule (**0 tokens**); if true, push `run`
   onto the p-queue; on completion, notify and (if recurring) reschedule.
@@ -166,9 +166,9 @@ Each is small and independently testable.
 | Reactive (event-driven) | `reply`; `notify_pending` (run by the approval outbox, not queued) | `NULL` | inherent, only runs when real |
 
 User-defined recurring jobs generalize the built-ins: a cron string plus a
-trigger prompt. This is why external adapters (calendar, email) can wait. They
-are absorbed for now by recurring prompts that use whatever tools/skills the
-assistant has that turn. As shipped, the assistant creates them only as
+trigger prompt. This is why external adapters (calendar, email) can wait: for
+now, recurring prompts that use whatever tools/skills the assistant has that
+turn cover them. As shipped, the assistant creates them only as
 `reminder` rows, one-off or with a cron, through its [job
 tools](#agent-job-tools).
 
@@ -179,19 +179,20 @@ tools](#agent-job-tools).
    disabled kinds, then seed the enabled built-ins (briefing, sweep,
    learn-review, Oneiros), keyed by `kind` (one active recurring row per
    built-in). The code definition is **authoritative for built-ins**: if a
-   built-in's cron string changed in code, its row's `recurrence`/`run_at` are
-   updated. User-defined jobs are DB-authoritative and never overwritten from
-   code. Finally, realign recurring rows to the configured time zone.
+   built-in's cron string changed in code, the daemon updates its row's
+   `recurrence`/`run_at`. User-defined jobs are DB-authoritative and never
+   overwritten from code. Finally, realign recurring rows to the configured
+   time zone.
 2. **Loop.** Every ~30s (and via croner for precise recurrence), call
    `tick(now)`: `claimDue` → per job, gate → *skip + reschedule* or *run on the
    p-queue* → notify + reschedule.
-3. **Reschedule.** After a recurring job runs (or is skipped), the next `run_at`
-   is computed from `recurrence` and written back.
+3. **Reschedule.** After a recurring job runs (or is skipped), the daemon
+   computes the next `run_at` from `recurrence` and writes it back.
 
 ## Owner-selectable built-ins
 
-The built-in recurring jobs are the assistant's defaults, not a mandate: the
-owner decides which run and in which time zone. The choice is a small file,
+The built-in recurring jobs are the assistant's defaults; the owner decides
+which run and in which time zone. The choice is a small file,
 `<FORTYTWO_ROOT>/.fortytwo/schedules.json`, **owned by the scheduler** (the
 installer only asks and writes it):
 
@@ -202,7 +203,7 @@ installer only asks and writes it):
 
 - A kind not listed is **on**; a missing file means every built-in is on, so
   installs that predate the file are unchanged. Unknown kinds are ignored.
-- The file is **read once at boot**; changes apply after a restart.
+- The daemon reads the file **once at boot**; changes apply after a restart.
 - A disabled kind has its active recurring row **retired** (`complete`, no
   reschedule, status `done`). One-off rows of the same kind are untouched.
   Re-enabling inserts a **fresh** row at the next boot; the old `done` row
@@ -230,7 +231,7 @@ The *only* token cost in the system is a `run` whose gate has already passed.
 
 ## Event hooks (reactive jobs)
 
-An "event hook" here is simply **a point in another component's code where, when
+An "event hook" here is **a point in another component's code where, when
 something real happens, it calls the scheduler's `enqueue(...)`**. The scheduler
 never polls the outside world for work; producers tell it there is work by
 writing a row. The one exception is memory's approval outbox (below), which the
@@ -253,8 +254,8 @@ handler stays for jobs queued by older installs; nothing enqueues it.
 Because producers are **separate processes** and SQLite has no pub/sub, the
 daemon notices newly-enqueued jobs through the **cheap ~30s `claimDue` poll**,
 with no IPC, no signalling, and (because it never calls the LLM) no token cost.
-Latency is at most the poll interval (tunable). Croner is retained for precise
-recurrence math, not as the sole wake source.
+Latency is at most the poll interval (tunable). The daemon keeps croner for
+precise recurrence math, not as the sole wake source.
 
 Reactive jobs have **no `hasWork` gate**. Being enqueued *is* the signal that
 there is work, so they always run. De-duplication therefore happens at the
@@ -336,12 +337,12 @@ interactive messages.
   `pending` inserts, which is the intended behavior. `cancel_job` (another
   process) changes only `pending` rows, in one UPDATE, so a row the daemon
   claims at the same moment is reported as running and left alone.
-- **Stale-claim recovery.** On restart (or after a crash), `running` rows older
-  than `STALE_RUNNING_MS` (default **15 min**, a config constant) are returned to
-  `pending` so they re-run.
+- **Stale-claim recovery.** On restart (or after a crash), the daemon returns
+  `running` rows older than `STALE_RUNNING_MS` (default **15 min**, a config
+  constant) to `pending` so they re-run.
 - **Failures.** Increment `attempts`, store `last_error`, and retry with a fixed
   MVP schedule: **3 attempts** at **1 min → 5 min → 30 min**. After the cap the
-  row is marked `failed` and a note is written to the conversation log (the
+  daemon marks the row `failed` and writes a note to the conversation log (the
   transcript when installed; otherwise dropped). (A tunable backoff policy is
   deferred.)
 - **Serialized turns.** p-queue concurrency 1 keeps LLM turns from overlapping.

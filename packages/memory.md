@@ -5,8 +5,8 @@ free-form provenance and recalls them by meaning (vector search), by keyword
 (FTS5), or by structured filter. Backed by SQLite + [`sqlite-vec`], with
 embeddings from a local Ollama model (or an opt-in remote provider).
 
-It is **persona-agnostic**: no chat/persona/approval coupling, just a
-generic memory store and tool surface. It can be used on its own, as a library,
+It is **persona-agnostic**: a generic memory store and tool surface with no
+chat/persona/approval coupling. It can be used on its own, as a library,
 or through `@justfortytwo/installer`, which registers it in your project.
 
 - **Version:** `2.0.0` (the jobs queue moves to the scheduler; see
@@ -54,7 +54,7 @@ the tools as `mcp__fortytwo-memory__<tool>`:
 | `reindex` | self-heal the doc index from a markdown directory |
 | `export_range` | render a date range of memories to markdown |
 
-On connect, the server sends usage **instructions** in the MCP `initialize`
+On connect, the server sends usage instructions in the MCP `initialize`
 result (when to search vs. store, which search tool fits, how to correct a
 memory with `supersedes`). The text lives in `src/server.ts`.
 
@@ -135,7 +135,7 @@ different dimensionality requires a schema change.
 
 ## Embedder
 
-Default: **`OllamaEmbedder`** against a local Ollama `/api/embeddings`
+Default: `OllamaEmbedder` against a local Ollama `/api/embeddings`
 endpoint.
 
 ```bash
@@ -144,7 +144,7 @@ EMBED_MODEL=qwen3-embedding:0.6b         # default model (1024-dim)
 ```
 
 If `EMBED_MODEL` is **unset**, the server falls back to a deterministic,
-dependency-free **`FakeEmbedder`**, for tests, CI, and first-run smoke checks
+dependency-free `FakeEmbedder`, for tests, CI, and first-run smoke checks
 with zero infra.
 
 Remote providers are opt-in via `EMBED_PROVIDER=openai`; only models that emit
@@ -195,7 +195,7 @@ import {
 - `store` / `recall` / `query` / `lexical`: same operations the MCP tools
   expose.
 - `deleteByIds(h, ids)`: hard-delete (row + vector + FTS). Intentionally a
-  **library API and NOT an MCP tool**: deletion is owner-privileged, and
+  **library API and not an MCP tool**: deletion is owner-privileged, and
   exposing it to the assistant's turn loop would let prompt-injected content
   trick it into erasing memories. Selecting which ids to remove is the
   caller's job (see the installer's `forget`).
@@ -210,13 +210,13 @@ import {
 ## Continuous enrichment
 
 `enrich(h, embedder, candidates)` folds a batch of candidate memories into the
-store: drops low-salience candidates, **dedupes** near-duplicates by meaning,
+store: drops low-salience candidates, dedupes near-duplicates by meaning,
 and writes the survivors with provenance, honoring an explicit `supersedes`
 to replace a stale belief. `enrichFromTurn(h, embedder, turn, extractor)` runs
 an injected `SalienceExtractor` and feeds its candidates to `enrich`.
 
 The salience extractor itself is model-driven and lives in the sibling
-**`@justfortytwo/salience`**. Memory owns only the dedupe + write, never the
+`@justfortytwo/salience`. Memory owns only the dedupe + write, never the
 model call.
 
 ## Peer seams

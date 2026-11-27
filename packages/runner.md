@@ -69,8 +69,8 @@ Guarantees and semantics:
   diagnostic, not automatically fatal.
 - Session state: `starting` → `ready` → `running` → `closed`/`failed`, plus
   `sessionId`, `startedAt`, `lastActivityAt`, `exitCode`, `exitSignal`, and a
-  copied/frozen `config`. Session IDs are captured from Claude output; the
-  runner neither stores them nor implements conversation memory.
+  copied/frozen `config`. The runner captures session IDs from Claude output
+  but neither stores them nor implements conversation memory.
 
 Events:
 

@@ -1,10 +1,9 @@
 # `@justfortytwo/salience`
 
-The **salience extraction** engine for fortytwo. Given a conversational turn,
-it distils a small set of **atomic, self-contained candidate memories**, each
-with a **salience score**, so the write-side (`@justfortytwo/memory`'s
-enrichment loop) can dedupe, supersede, and persist only what is worth
-keeping.
+The salience extraction engine for fortytwo. Given a conversational turn, it
+distils a small set of **atomic, self-contained candidate memories**, each with
+a salience score, so the write-side (`@justfortytwo/memory`'s enrichment loop)
+can dedupe, supersede, and persist only what is worth keeping.
 
 - **Version:** `0.1.1` · **Runtime:** pure library (ESM-only) · **Node:**
   >= 18 · **Zero runtime dependencies:** no provider SDK, no credentials
@@ -20,9 +19,8 @@ other way round, so salience can be used à la carte.
 
 ## Provider-agnostic by contract
 
-The host injects a `LlmClient`; salience only needs text-in / text-out,
-exactly mirroring how memory injects an `Embedder` rather than owning a model
-client:
+The host injects a `LlmClient`; salience only needs text-in / text-out, the
+same way memory injects an `Embedder` rather than owning a model client:
 
 ```ts
 import {

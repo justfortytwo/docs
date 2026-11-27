@@ -185,8 +185,8 @@ podman restart fortytwo        # the scheduler reads the choice at start
 Do not re-run `init` for this on a working install: it asks for your identity
 again. `fortytwo schedules` touches only `.fortytwo/schedules.json`.
 
-Built-in times are read in UTC unless you set a time zone (briefing 07:57,
-sweep 13:03 and 18:03, learn-review Sundays 09:17, Oneiros 03:17):
+The scheduler reads built-in times in UTC unless you set a time zone (briefing
+07:57, sweep 13:03 and 18:03, learn-review Sundays 09:17, Oneiros 03:17):
 
 ```bash
 podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo schedules --timezone Europe/Rome'
@@ -211,8 +211,8 @@ A held action then shows up in the paired chat with Approve / Deny buttons.
 `npx fortytwo gate` shows the state and `npx fortytwo gate off` (plus a restart)
 removes it. Tune what is held in `/workspace/.claude/policy/capabilities.toml`
 and which Bash commands run freely in `/workspace/rules/bash-allowlist.jsonl`.
-The hook also applies to sessions you open by hand in `claude-code`, and a held
-action in a scheduled run is cleared with `npx fortytwo-gate list` and
+The hook also applies to sessions you open by hand in `claude-code`. To clear a
+held action in a scheduled run, use `npx fortytwo-gate list` and
 `npx fortytwo-gate approve <id>`.
 
 ## Updating
@@ -243,8 +243,8 @@ backup for that.
 
 This upgrade moves the `jobs` queue from memory to the scheduler and adds
 memory migration `006_approvals_notified_at`. Take the backup above before it:
-`rollback` does not undo the migration. The existing `jobs` table and its rows
-are kept as they are.
+`rollback` does not undo the migration. The upgrade keeps the existing `jobs`
+table and its rows as they are.
 
 - `update` adds the `fortytwo-scheduler` entry to `.mcp.json` (the assistant's
   `enqueue_job` / `list_jobs` / `cancel_job` tools); `podman restart
@@ -262,7 +262,8 @@ are kept as they are.
   never `CronCreate`) lives in `context/INDEX.md`, which `update` does not
   re-render. It arrives with `npx fortytwo init` (re-asks for your identity;
   captured files you edited are kept).
-- Approvals still pending at the upgrade are announced once more.
+- The scheduler's approval outbox announces approvals still pending at the
+  upgrade once more.
 
 ### Starting a fresh chat session
 
@@ -336,7 +337,8 @@ session from the WAHA dashboard with a QR code.
 
 MCP guideline: use MCP for real external capabilities (memory, WhatsApp, mail).
 Do not wrap in fortytwo what Claude Code already does (shell, files, git, web),
-and do not create a subagent per tool: a subagent is a role, not an API wrapper.
+and do not create a subagent per tool or use one as an API wrapper: a subagent
+is a role.
 
 ## Security
 

@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`**: the install-time alias; with no verb it runs `init`.
 - **`fortytwo`**: the everyday lifecycle alias.
 
-- **Version:** `1.1.0` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.1.1` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -31,7 +31,7 @@ to connect. Until then the bot ignores everyone.
 
 ## The two-surface model
 
-fortytwo is delivered as **two surfaces**, and this CLI is the single operator
+fortytwo ships as **two surfaces**, and this CLI is the single operator
 interface over both:
 
 1. **The npm engine.** The reusable machinery (the memory MCP server, the
@@ -107,7 +107,7 @@ No global npm install. `init`:
    records it and every project runs its own version.
 2. Installs a small launcher named `fortytwo` into the first writable dir on
    `PATH` of `~/.local/bin`, `~/bin`, or npm's global bin (`FORTYTWO_BIN_DIR`
-   overrides). Shell config and `PATH` are never edited.
+   overrides). `init` never edits shell config or `PATH`.
 
 The launcher holds no version and no project path: it finds the nearest
 directory containing `.fortytwo/` and runs that project's own pinned
@@ -130,7 +130,7 @@ switch; nothing else records the state. `gate on` adds it (other settings and
 hooks are kept) and writes two files when they are missing. Both are the
 owner's to tune and are never overwritten:
 
-| File | What it decides |
+| File | What it controls |
 |---|---|
 | `.claude/policy/capabilities.toml` | Which tools run on their own: reading, files in the project, skills, fortytwo's memory, and listing and creating reminders (`mcp__fortytwo-scheduler__list_jobs` and `__enqueue_job` are `internal`). Cancelling a reminder (`__cancel_job`, `irreversible`) waits for approval. Everything else, including any tool not listed, is held. A manifest written before the job tools existed holds them; `doctor` names the lines to add. |
 | `rules/bash-allowlist.jsonl` | The Bash commands that run without asking (`pwd`, `date`, `ls`, `cat`, `head`, `tail`, `wc`, `grep`). Every other command is held, and so is any command containing `;` `&` `\|` `<` `>` or a substitution. git is left out on purpose. |
@@ -147,8 +147,8 @@ for it with `fortytwo start --telegram-approvals`.
 
 Limits: the hook applies to every Claude Code session started in the project
 folder; a scheduled run stopped by a held action sends a notice naming it
-(scheduler 1.0.7+), and the action is cleared with `npx fortytwo-gate list` /
-`approve <id>`; a change applies after a restart.
+(scheduler 1.0.7+), and the owner clears the action with
+`npx fortytwo-gate list` / `approve <id>`; a change applies after a restart.
 
 ## Passing arguments to Claude Code
 
@@ -220,9 +220,8 @@ memory, other env keys kept): the assistant's `enqueue_job` / `list_jobs` /
 scheduler without that bin gets no entry, and an entry this CLI wrote earlier is
 removed. `status` shows a `Job tools` line; `status` and `doctor` warn when the
 entry is missing, points at a different database than memory, or is held by the
-safety gate. The agent is told to use these tools by persona's
-`context/INDEX.md`, which an existing install receives on the next
-`fortytwo init`.
+safety gate. Persona's `context/INDEX.md` tells the agent to use these tools;
+an existing install receives it on the next `fortytwo init`.
 
 ## MCP extensions and the transcript
 
