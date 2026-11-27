@@ -1,6 +1,6 @@
 # `@justfortytwo/telegram`
 
-The **Telegram channel adapter** for fortytwo — a standalone, always-on
+The **Telegram channel adapter** for fortytwo: a standalone, always-on
 **bridge** connecting a Telegram bot to persistent Claude Code sessions through
 `@justfortytwo/runner`.
 
@@ -12,7 +12,7 @@ The **Telegram channel adapter** for fortytwo — a standalone, always-on
 The assistant needs a channel that reaches the owner where they already are.
 telegram owns Telegram identity, pairing, message transport, attachment
 handling, and the chat → live-session mapping. It delegates the agent process
-lifecycle entirely to runner — it makes no provider or model decisions.
+lifecycle entirely to runner; it makes no provider or model decisions.
 
 ## Behavior
 
@@ -26,7 +26,7 @@ lifecycle entirely to runner — it makes no provider or model decisions.
    streaming. A result finalizes the reply; long replies use additional
    messages of at most 4000 UTF-16 units. Typing refreshes while submitted
    inputs await results. Deferred results produce a plain notice: Telegram
-   cannot authorize the action — Claude Code owns tool permissions; gate is
+   cannot authorize the action. Claude Code owns tool permissions; gate is
    optional policy through Claude hooks/plugins. With `TELEGRAM_APPROVALS` set
    (since 1.0.3), a deferral the gate staged as pending becomes a card with
    **Approve** / **Deny** buttons showing the tool and its exact input. A tap
@@ -59,7 +59,7 @@ carries no `file_name`, the stored name comes from the message and file ids,
 as with the other attachment kinds. Files over the download limit are skipped
 and reported.
 
-Limitation: the agent receives the stored file path only — nothing transcribes
+Limitation: the agent receives the stored file path only; nothing transcribes
 audio yet. Transcription, video and video-note ingestion, and richer handling
 of oversized files are tracked separately.
 
@@ -141,19 +141,19 @@ is self-owned:
 
 | Implementation | Role |
 | --- | --- |
-| `SqliteBindingStore` | default — tiny `better-sqlite3` db in its own file (`state/telegram-bindings.db`) holding bindings + pending challenges |
+| `SqliteBindingStore` | default: a tiny `better-sqlite3` db in its own file (`state/telegram-bindings.db`) holding bindings + pending challenges |
 | `MemoryBindingStore` | in-process Map, for tests / ephemeral use |
 | `BindingStore` | the injectable interface |
 
 If fortytwo later standardizes a shared identity table, swap the default for
-a memory-backed `BindingStore` — the login flow is unaffected.
+a memory-backed `BindingStore`; the login flow is unaffected.
 
 ## Dependencies
 
 | Package | Used for | Contract |
 | --- | --- | --- |
 | `@justfortytwo/runner` (pinned `1.0.1`) | Claude process/session lifecycle | library API |
-| `@justfortytwo/gate` (regular dep) | `createSourceEnvelope` provenance helper in `attachments.ts` — the *policy hook* stays optional and separately configured | `POLICY_SCHEMA_VERSION` |
+| `@justfortytwo/gate` (regular dep) | `createSourceEnvelope` provenance helper in `attachments.ts`; the *policy hook* stays optional and separately configured | `POLICY_SCHEMA_VERSION` |
 | `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the shared DB at startup; recall happens inside the headless `claude` turn via the memory MCP tools | `MEMORY_TOOL_CONTRACT_VERSION` |
 | `@justfortytwo/transcript` *(new, optional peer, loaded dynamically)* | the `ConversationLog` implementation that persists each channel event (see below) | `createTranscript` / `prepareTranscript` |
 | `@justfortytwo/scheduler` (optional peer `^2.0.0`, loaded dynamically) | the reply queue: the `jobs` table and job API | `runSchedulerMigrations`, `enqueue`, `existsPending` |
@@ -207,7 +207,7 @@ interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
 | `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + conversation-log actor labels. Keep `OWNER_ACTOR` at its default `owner`: Oneiros counts only inbound Telegram messages with actor `owner` as owner evidence, so another label stops persona consolidation from learning from chat. |
 | `FORTYTWO_ROOT` | no | Working root for the headless `claude` process + state files (`FORD_ROOT` is a deprecated alias). |
 
-Proxy auth for the headless `claude` session is not read here — the CLI reads
+Proxy auth for the headless `claude` session is not read here. The CLI reads
 `ANTHROPIC_*` from its own config. The bridge also loads
 `config/adapters.toml` from `$FORTYTWO_ROOT/config/`.
 
@@ -218,7 +218,7 @@ npm run build
 node dist/bridge.js
 ```
 
-Run under a restart loop (tmux/systemd) — or under `fortytwo start`, which
+Run under a restart loop (tmux/systemd), or under `fortytwo start`, which
 supervises it together with the scheduler. Attachments: photo/document
 **captions** are preserved in the same Claude turn as attachment details and
 in inbound conversation-log text; message text takes precedence when present.

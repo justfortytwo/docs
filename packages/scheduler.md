@@ -5,7 +5,7 @@ and API), kept in the database opened by `@justfortytwo/memory`, and fires LLM
 turns only behind a cheap "is there work?" gate. It also ships the assistant's
 job tools as an MCP server.
 
-The design rationale — durable jobs, token gating, crash safety, event hooks —
+The design rationale (durable jobs, token gating, crash safety, event hooks)
 is in [Scheduler & Durable Jobs](../scheduler.md). This page documents the
 package as built.
 
@@ -237,11 +237,11 @@ prompt through `@justfortytwo/runner` in an isolated temporary cwd:
 
 No tools, MCP, skills or session persistence are enabled; maintenance emits no
 notification into memory. Authentication/provider configuration is preserved.
-Requires a Claude CLI with `--safe-mode` — unsupported flags **fail closed**.
+Requires a Claude CLI with `--safe-mode`; unsupported flags **fail closed**.
 
 ## Running it
 
-The daemon is a long-running process — run it under a restart loop (tmux for
+The daemon is a long-running process. Run it under a restart loop (tmux for
 development, systemd for production) or under `fortytwo start`, which
 supervises it together with the Telegram bridge.
 
@@ -261,8 +261,8 @@ supervises it together with the Telegram bridge.
 
 ### Liveness
 
-On boot and on every 30-second poll tick — even while a previous tick is still
-in flight — the daemon writes `$(dirname $DB_PATH)/scheduler.heartbeat`
+On boot and on every 30-second poll tick, even while a previous tick is still
+in flight, the daemon writes `$(dirname $DB_PATH)/scheduler.heartbeat`
 containing `{ "pid", "ts" }`. The write is outside the poll's overlap guard so
 a long-running turn never starves it. `fortytwo doctor` warns (non-fatal) if
 the file is missing or older than 90 seconds.
@@ -295,14 +295,14 @@ actor `assistant` and kind = the notification kind.
 
 ## Dependencies
 
-- `@justfortytwo/memory` (pinned `2.0.0`) — the database handle (`openDb`),
+- `@justfortytwo/memory` (pinned `2.0.0`): the database handle (`openDb`),
   `applyMigrations`, the approvals outbox and `countPendingApprovals`.
-- `@justfortytwo/runner` (pinned `1.0.1`) — LLM turns for handlers.
-- `@modelcontextprotocol/sdk` — the `fortytwo-scheduler-mcp` server.
-- `@justfortytwo/persona` (pinned `1.0.2`) — Oneiros `hasWork`/`refine`/
+- `@justfortytwo/runner` (pinned `1.0.1`): LLM turns for handlers.
+- `@modelcontextprotocol/sdk`: the `fortytwo-scheduler-mcp` server.
+- `@justfortytwo/persona` (pinned `1.0.2`): Oneiros `hasWork`/`refine`/
   `workerPrompt`.
-- `@justfortytwo/telegram` — **optional peer**; enables the Telegram notifier.
-- `@justfortytwo/transcript` *(new)* — **optional peer**; receives journal
+- `@justfortytwo/telegram`: **optional peer**; enables the Telegram notifier.
+- `@justfortytwo/transcript` *(new)*: **optional peer**; receives journal
   entries and serves the Oneiros transcript stream.
 
 ## Testing

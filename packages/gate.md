@@ -2,33 +2,33 @@
 
 A standalone, agent-agnostic **PreToolUse safety gate** for Claude Code. It
 decides, *before any tool runs*, whether a call is safe to auto-run, must be
-**deferred for a one-shot human approval**, or should be **denied outright** —
-**fail-closed**: anything unrecognized, and anything that errors, is blocked
+**deferred for a one-shot human approval**, or should be **denied outright**.
+It is **fail-closed**: anything unrecognized, and anything that errors, is blocked
 rather than waved through.
 
 - **Version:** `1.0.0` · **Runtime:** Claude Code plugin, PreToolUse hook, or
-  plain library · **Node:** >= 18 · **Leaf package** — no `@justfortytwo/*`
+  plain library · **Node:** >= 18 · **Leaf package**: no `@justfortytwo/*`
   peers, no database, no network
 
 ## Why this exists
 
 LLM agents happily run whatever a tool, a web page, or a chat message tells
 them to. A blocklist ("never run `rm -rf`") fails open: anything you didn't
-think of slips through. The gate inverts that — the dangerous **and the
+think of slips through. The gate inverts that: the dangerous **and the
 unknown** both stop and wait for you, while genuinely safe, known operations
 stay fast.
 
 ## Three independent parts
 
-1. **Capability policy engine** — every tool is tagged with an *autonomy tier*
+1. **Capability policy engine**: every tool is tagged with an *autonomy tier*
    (`read`, `internal`, `draft`, `external`, `irreversible`) in a small TOML
    manifest. Auto tiers pass; outward/destructive tiers defer for approval.
-2. **Fail-closed bash allowlist** — `Bash` defers by default; only explicitly
+2. **Fail-closed bash allowlist**: `Bash` defers by default; only explicitly
    allowlisted commands (anchored, chaining-safe globs in a JSONL file)
    fast-path. **Deny always wins**: a dangerous command (`git push`, `rm -rf`,
    `curl --data`, `sudo`, …) can never be laundered past the gate by a broad
    allowlist glob.
-3. **PreToolUse hook** — reads the Claude Code hook event on stdin, emits the
+3. **PreToolUse hook**: reads the Claude Code hook event on stdin, emits the
    permission decision on stdout.
 
 ## Install & wire
@@ -40,7 +40,7 @@ npm install @justfortytwo/gate
 **As a Claude Code plugin (recommended):** the package ships
 `.claude-plugin/plugin.json` and `hooks/hooks.json` wiring a `PreToolUse`
 matcher `"*"` to `dist/gate-hook.js` via `${CLAUDE_PLUGIN_ROOT}`. Plugin hooks
-compose with project/user hooks — the gate adds to, never replaces, existing
+compose with project/user hooks; the gate adds to, never replaces, existing
 setup.
 
 **As a hand-wired hook:** add to `.claude/settings.json`:
@@ -79,13 +79,13 @@ ignores `defer`.
 
 1. The agent calls an `external`/`irreversible` tool. The gate **defers** and
    stages a pending one-shot keyed by the call's `tool_use_id`.
-2. You clear it out of band with the CLI — `fortytwo-gate approve
+2. You clear it out of band with the CLI: `fortytwo-gate approve
    <tool_use_id>` (or `deny`). A host integration can instead call
    `setDecisionByToolUseId(...)` on its own store.
 3. The agent re-fires the same call. The gate **consumes the one-shot exactly
    once** and allows it; any later re-fire is denied.
 
-`approve`/`deny` only act on a **pending** call — an already-consumed or
+`approve`/`deny` only act on a **pending** call. An already-consumed or
 denied one-shot is immutable, so an approval can never be resurrected into a
 second run.
 
@@ -126,7 +126,7 @@ contributes a SQLite-backed `GateApprovalStore`.
 
 There is also a content-trust policy engine (`decidePolicy`,
 `classifyAuthority`, `canUseAsInstruction`, …) for the *"may this source
-instruct the agent?"* question — the principled trusted/untrusted boundary
+instruct the agent?"* question: the principled trusted/untrusted boundary
 when ingesting web pages, messages, or tool output.
 
 ## Configuration
@@ -147,7 +147,7 @@ directory; without it, the hook event's `cwd`.
 **Manifest** (TOML, see `examples/capabilities.toml`): `default_tier`
 (recommended `external`); `[tiers]` exact tool name → tier plus trailing-`*`
 prefix globs; `[bash]` regex patterns that only ever **elevate** Bash (and
-double as the denylist, highest match wins); `[guard].files` — project-relative
+double as the denylist, highest match wins); `[guard].files` lists project-relative
 paths whose edit is `irreversible` (point at the manifest, settings and
 allowlist so the gate can't be silently weakened). An entry ending in `/`
 guards everything below that directory; `[guard].outside_project = true` also
@@ -159,7 +159,7 @@ session's current directory.
 **Bash allowlist** (JSONL, see `examples/bash-allowlist.jsonl`):
 `command_glob` (required, anchored, whole-command), `cwd_glob` (default `*`),
 `expires_at` (ISO 8601), `approved_by`, `note`. Prefer exact commands; a
-trailing `*` re-enables chaining — use sparingly.
+trailing `*` re-enables chaining, so use it sparingly.
 
 ## Contracts
 
@@ -171,11 +171,11 @@ decisions bumps `POLICY_SCHEMA_VERSION` **and** the package major.
 
 ## Consumers
 
-- **`@justfortytwo/telegram`** — regular dependency for the
+- **`@justfortytwo/telegram`**: regular dependency for the
   `createSourceEnvelope` provenance helper; the policy hook stays optional.
-- **`@justfortytwo/memory`** — optional peer, contributing
+- **`@justfortytwo/memory`**: optional peer, contributing
   `GateApprovalStore` (SQLite-backed `ApprovalStore` + `AuditLogger`).
-- **`@justfortytwo/installer`** — `doctor` cross-checks
+- **`@justfortytwo/installer`**: `doctor` cross-checks
   `POLICY_SCHEMA_VERSION` compatibility.
 
 ## Testing

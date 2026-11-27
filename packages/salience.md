@@ -7,20 +7,20 @@ enrichment loop) can dedupe, supersede, and persist only what is worth
 keeping.
 
 - **Version:** `0.1.1` · **Runtime:** pure library (ESM-only) · **Node:**
-  >= 18 · **Zero runtime dependencies** — no provider SDK, no credentials
+  >= 18 · **Zero runtime dependencies:** no provider SDK, no credentials
 
 ## Why this exists
 
 This is the piece a **memory server must not embed**: storing and recalling is
 memory's job; deciding *what is worth remembering* is a model-driven judgement,
 and that judgement lives here. salience owns the contract plus a reference
-implementation — **never a provider**. It does not depend on
+implementation, **never a provider**. It does not depend on
 `@justfortytwo/memory`; memory depends on salience (optional peer), never the
 other way round, so salience can be used à la carte.
 
 ## Provider-agnostic by contract
 
-The host injects a `LlmClient`; salience only needs text-in / text-out —
+The host injects a `LlmClient`; salience only needs text-in / text-out,
 exactly mirroring how memory injects an `Embedder` rather than owning a model
 client:
 
@@ -49,11 +49,11 @@ const candidates: Candidate[] = await extractor.extractSalient({
 | Export | Role |
 | --- | --- |
 | `Turn` | a conversational turn (free-form text + optional provenance) |
-| `Candidate` | a distilled, scored memory — aligned with memory's `EnrichmentCandidate`, so candidates flow into `enrich()` with no remapping |
+| `Candidate` | a distilled, scored memory, aligned with memory's `EnrichmentCandidate`, so candidates flow into `enrich()` with no remapping |
 | `LlmClient` | the injected, minimal completion seam |
 | `SalienceExtractor` | the extraction contract; `extractSalient(turn, opts)` → scored `Candidate[]` |
 | `createSalienceExtractor(llm)` | the reference implementation: frames the task, runs the client, parses, scores, filters, stamps provenance |
-| `SALIENCE_SYSTEM_PROMPT` | the exported system framing — a plain `const` to read or override when tuning extraction policy without forking |
+| `SALIENCE_SYSTEM_PROMPT` | the exported system framing: a plain `const` to read or override when tuning extraction policy without forking |
 
 ## Output convention
 
@@ -64,11 +64,11 @@ const candidates: Candidate[] = await extractor.extractSalient({
 [{ "content": "the owner ships on Fridays", "salience": 0.9, "observed": "stated" }]
 ```
 
-Each object needs `content` (non-empty) and `salience` (0–1); `source`,
+Each object needs `content` (non-empty) and `salience` (0-1); `source`,
 `observed`, `date`, `tags`, `meta` are optional. Parsing is **lenient and
 fail-soft**: the array is extracted even from prose- or fence-wrapped output,
 malformed items are skipped, `salience` is clamped to `[0,1]`, and unparseable
-output yields `[]` — never a throw, because one bad turn must not crash an
+output yields `[]`, never a throw, because one bad turn must not crash an
 enrichment loop. Candidates inherit the turn's
 `source`/`observed`/`date` where the model leaves them blank
 (`opts.defaultObserved` is the final fallback).

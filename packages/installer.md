@@ -1,11 +1,11 @@
 # `@justfortytwo/installer`
 
-The all-in-one installer and lifecycle CLI for **fortytwo** — it scaffolds the
+The all-in-one installer and lifecycle CLI for **fortytwo**. It scaffolds the
 persona surface and provisions the npm engine (memory MCP, safety gate, channel
 adapters, embedder). One package ships two bins:
 
-- **`create-fortytwo`** — the install-time alias; with no verb it runs `init`.
-- **`fortytwo`** — the everyday lifecycle alias.
+- **`create-fortytwo`**: the install-time alias; with no verb it runs `init`.
+- **`fortytwo`**: the everyday lifecycle alias.
 
 - **Version:** `1.1.0` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
@@ -15,7 +15,7 @@ adapters, embedder). One package ships two bins:
 The ecosystem is a set of small, independently versioned packages. Someone has
 to own the *assembly*: pick compatible versions, wire `.mcp.json`, render the
 personal persona, provision local infra, and keep the result updatable and
-rollback-able. That is this CLI — the bootstrap and lifecycle entry point of
+rollback-able. That is this CLI: the bootstrap and lifecycle entry point of
 fortytwo.
 
 ## Quick start
@@ -34,10 +34,10 @@ to connect. Until then the bot ignores everyone.
 fortytwo is delivered as **two surfaces**, and this CLI is the single operator
 interface over both:
 
-1. **The npm engine.** The reusable machinery — the memory MCP server, the
-   safety gate, the channel adapters, the local embedder — published as
+1. **The npm engine.** The reusable machinery (the memory MCP server, the
+   safety gate, the channel adapters, the local embedder) is published as
    `@justfortytwo/*` packages and wired in as Claude Code plugins.
-2. **The scaffolded persona.** `CLAUDE.md` + `context/*` — who the assistant
+2. **The scaffolded persona.** `CLAUDE.md` + `context/*`: who the assistant
    is and who it serves. **Not** a plugin: per-user, personal, gitignored. The
    CLI scaffolds it by rendering `@justfortytwo/persona`'s `templates/`
    (guided by its `manifest.json`) against the captured answers in
@@ -51,24 +51,24 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 
 | Verb | What it does |
 |------|--------------|
-| `start` | Run fortytwo in the foreground: load the project `.env` (process env wins over it), start every installed and configured service, prefix and forward their logs, stop them all on Ctrl+C/SIGTERM. Never daemonizes or restarts — the surrounding service manager owns that. |
+| `start` | Run fortytwo in the foreground: load the project `.env` (process env wins over it), start every installed and configured service, prefix and forward their logs, stop them all on Ctrl+C/SIGTERM. Never daemonizes or restarts; the surrounding service manager owns that. |
 | `status` | Show whether fortytwo, the Telegram bridge and the scheduler are running, and whether memory is configured; a `Job tools` line shows the scheduler's MCP entry. Exits 0 when running, 3 when not (usable as a health check). |
 | `stop` | Stop this project's `fortytwo start`. Signals only the process recorded in `.fortytwo/runtime.json`, and only while its heartbeat is fresh **and** its OS process-start identity matches; never looks for processes by name. |
 | `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, copy the skills the built-in schedules call into `.claude/skills/`, ask which built-in schedules to run (`--schedules all|none|<kind,kind>` when non-interactive; stored in `.fortytwo/schedules.json`) and save the owner's time zone when none is saved and it is not UTC (`update` never touches it), provision local infra (embedder model, memory DB migration plus the scheduler's `jobs` migration via `runSchedulerMigrations`), record the installed version set. |
 | `pair` | Issue a one-time `/login` pairing code, persisted to the bridge's bindings db (dynamic counterpart of the static `ALLOWED_CHAT_IDS` allowlist). Refuses when Telegram isn't running, unless `--force`. |
 | `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), whether the optional safety gate is on, and the scheduler's job tools (see [Scheduler job tools](#scheduler-job-tools)). |
 | `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline, refresh the shipped skills in `.claude/skills/` (a same-named skill you wrote yourself is left alone), then run `doctor`. `--dry-run` reports without installing. |
-| `rollback` | Re-install the previous version set recorded before the last `update`, then run `doctor`. Manual by design — never auto-triggered. |
+| `rollback` | Re-install the previous version set recorded before the last `update`, then run `doctor`. Manual by design, never auto-triggered. |
 | `enrich` | Capture more answers to deepen the persona, then re-render (no clobber). |
 | `onboard` | Review and save the owner profile drafted by persona's `onboarding` skill (see [Owner onboarding](#owner-onboarding)). Shows each change with its source and saves only what the owner confirms in a terminal. `--dry-run` only shows; `--draft <path>` reviews another file. |
-| `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until` — previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
+| `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until`, previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
 | `unbind` | Revoke a channel binding (un-pair a chat / drop it from the allowlist). |
 | `gate` | Show or change the optional safety gate: `gate on` holds outward and destructive actions for approval, `gate off` removes it. Off by default; restart Fortytwo to apply. See [The safety gate](#the-safety-gate-optional). |
 | `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking; `--timezone <IANA name\|utc>` sets the zone the built-in times (and Oneiros) are read in, and `--list` prints it (`Times are in <zone>`). In a terminal it also asks for the zone; a name that is not a time zone exits 2 and saves nothing. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
 
 ## Versioning and compatibility
 
-Engine versions live only in `package.json` `fortytwo.compat` — deliberately
+Engine versions live only in `package.json` `fortytwo.compat`, deliberately
 **not** in `peerDependencies`, so upgrading the installer never trips npm's
 peer resolution:
 
@@ -93,10 +93,10 @@ companion (today `@justfortytwo/transcript`) is missing, `update` installs it,
 so chat keeps being recorded. `doctor` and `status` warn (without failing) when
 memory is installed but the declared transcript is not. This compat block is
 the `1.0` contract. telegram and scheduler pull in
-`@justfortytwo/runner` themselves — the installer never installs runner
+`@justfortytwo/runner` themselves; the installer never installs runner
 directly. Pass `--no-install` to manage engine packages yourself.
 
-Distribution is **semver-ranges, latest-compatible** — no curated
+Distribution is **semver-ranges, latest-compatible**, with no curated
 bill-of-materials. Rollback is manual by design.
 
 ## The `fortytwo` launcher
@@ -111,7 +111,7 @@ No global npm install. `init`:
 
 The launcher holds no version and no project path: it finds the nearest
 directory containing `.fortytwo/` and runs that project's own pinned
-`node_modules/.bin/fortytwo` — only if you own that project's `.fortytwo/` and
+`node_modules/.bin/fortytwo`, but only if you own that project's `.fortytwo/` and
 CLI, so code another user plants in a shared directory is never run. It never
 replaces a `fortytwo` it did not write.
 
@@ -198,13 +198,14 @@ dies on its own it stops the rest and exits non-zero, so `restart` policies
 kick in.
 
 For development, each service still ships its own bin (`fortytwo-telegram-bridge`,
-`fortytwo-scheduler`) — export `.env` and `FORTYTWO_ROOT` yourself.
+`fortytwo-scheduler`). When you run one directly, export `.env` and
+`FORTYTWO_ROOT` yourself.
 
 ## The embedder
 
-The engine uses a **local** embedder for privacy — personal data never leaves
+The engine uses a **local** embedder for privacy: personal data never leaves
 the machine. Standard model `qwen3-embedding:0.6b` served by Ollama; `init`
-makes sure it is available (`GET /api/tags`, pulling over `POST /api/pull` —
+makes sure it is available (`GET /api/tags`, pulling over `POST /api/pull`;
 no `ollama` CLI needed on the installer's machine) and `doctor` verifies it.
 `--ollama-base-url` (or the interactive question) threads the endpoint into
 both `.env` and the memory server's `.mcp.json` entry.
@@ -308,11 +309,11 @@ result:
 ## Oneiros installation and upgrades
 
 `init` automatically initializes Oneiros at the current memory head and seeds
-one `persona.oneiros` scheduler job — no extra questions. An empty DB starts at
+one `persona.oneiros` scheduler job, with no extra questions. An empty DB starts at
 zero; an existing DB starts at its insertion high watermark. `update` never
 re-renders persona/context files; after installation and health checks it
 initializes only missing Oneiros state and reconciles the job via
-`UpdateDeps.reconcile` — the seam for explicit, idempotent machine-owned
+`UpdateDeps.reconcile`, the seam for explicit, idempotent machine-owned
 asset/state migrations. Curated context and historical memory are never
 replayed implicitly.
 
@@ -322,7 +323,7 @@ replayed implicitly.
 PID and heartbeat:
 
 - **Linux:** kernel boot ID + PID namespace + start ticks (field 22) of
-  `/proc/<pid>/stat` — a stale file from an earlier container cannot claim a
+  `/proc/<pid>/stat`, so a stale file from an earlier container cannot claim a
   new process merely because its PID was reused.
 - **macOS/other:** `ps -p <pid> -o lstart=` compared with a fixed
   locale/timezone; second-level precision (cannot distinguish same-second PID
@@ -360,4 +361,4 @@ memory deletion, channel pairing lifecycle.
 **Out of scope:** the engine behavior itself (owned by each sibling), the
 persona content (owned by `@justfortytwo/persona`), daemonization/restarts
 (owned by the surrounding service manager), tool permissions (owned by Claude
-Code — gate adds optional policy only through explicitly configured hooks).
+Code, and gate adds optional policy only through explicitly configured hooks).

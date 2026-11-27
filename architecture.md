@@ -17,7 +17,7 @@ model providers.
 An agent runtime alone is stateless between sessions and reactive to input.
 A personal assistant needs **continuity**: durable memory, durable time
 (scheduling), channels that reach the user, and a lifecycle that survives
-reboots and upgrades. fortytwo adds exactly that layer — and nothing more.
+reboots and upgrades. fortytwo adds exactly that layer, and nothing more.
 
 ## Principles
 

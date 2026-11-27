@@ -3,7 +3,7 @@
 The templated **identity and runtime context** for a fortytwo personal
 assistant. Ships the scaffolding the installer renders into a user's project
 so the assistant has a name, a voice, owner facts, house rules, and a
-recallable memory corpus — plus the internal **Oneiros** consolidation
+recallable memory corpus, plus the internal **Oneiros** consolidation
 library and prompt. It never ships an owner's real data.
 
 - **Version:** `1.1.0` · **Runtime:** static templates + manifest + compiled
@@ -40,44 +40,44 @@ Templates use `{{placeholder}}` tokens. The installer CLI drives the flow:
 
 1. **`fortytwo init`** prompts for each field in `manifest.json` (or accepts
    flags/env for non-interactive installs) and writes the answers to a
-   **gitignored `.fortytwo/identity.json`** — the single source of truth.
+   **gitignored `.fortytwo/identity.json`**, the single source of truth.
 2. The CLI renders every `templates/**/*.tmpl` against `identity.json` and
    writes the result into the gitignored `context/` (and `CLAUDE.md` at the
    project root).
 3. Re-running `init` re-renders managed templates and preserves captured
-   files; `update` reconciles machine-owned runtime assets only — it never
+   files; `update` reconciles machine-owned runtime assets only; it never
    re-renders context.
 
 The concise, always-loaded summary lives in `OWNER.md` / `PROFILE.md`; the
 deep, atomized owner profile lives in the memory MCP (retrieved on demand).
 
-## What ships — and what never does
+## What ships, and what never does
 
 The rendered output (`context/*`, `CLAUDE.md`), `.fortytwo/identity.json`,
 and any uploaded profile material are **all gitignored** in the user's
 project and **never** enter this repo. Every owner-specific value is a
 `{{placeholder}}` resolved at install time on the user's machine. `owner_email`
 and `owner_address` are captured for the owner record but deliberately have no
-template token — they stay in the gitignored identity file.
+template token; they stay in the gitignored identity file.
 
 ## Field manifest
 
 `manifest.json` carries `version`, `manifestVersion`, `description`, plus:
 
-- **`skills`** — Claude Code skills shipped under `skills/` without
+- **`skills`**: Claude Code skills shipped under `skills/` without
   placeholders: the two the scheduler's built-in jobs call (`daily-briefing`,
   `learn-review`) and, since 1.1.0, `onboarding`, which runs when the owner
   asks for it (see [Onboarding](#onboarding)). The installer copies them into
   the project's `.claude/skills/` on `init` and on every `update`, overwriting
   only its own earlier copy. Personal adjustments belong in
   `context/rules/APPROVED.md`.
-- **`files`** — template → output → render mode:
-  - **`managed`** — re-rendered on every `init` (`CLAUDE.md`, the `INDEX.md`
+- **`files`**: template → output → render mode:
+  - **`managed`**: re-rendered on every `init` (`CLAUDE.md`, the `INDEX.md`
     files); not meant for hand-editing.
-  - **`captured`** — rendered **once** on first install, then owner-owned and
+  - **`captured`**: rendered **once** on first install, then owner-owned and
     never clobbered (`OWNER.md`, `PROFILE.md`, `SOUL.md`, `rules/`, the whole
     memory corpus).
-- **`fields`** — descriptors like:
+- **`fields`**: descriptors like:
 
 ```json
 {
@@ -153,7 +153,7 @@ own state files:
   knowledge/depth. Observations without an allowed home stay in memory.
   Semantic classification is model policy; the deterministic validator
   enforces the narrow structural surface.
-- **Cursor:** `{ database, position }` — persistent DB identity plus the
+- **Cursor:** `{ database, position }`, a persistent DB identity plus the
   AUTOINCREMENT high watermark (deleted IDs included). Memory supplies
   bounded ascending pages; the checkpoint records only the reviewed page.
   No-op reviews also advance; new memory arriving mid-run waits for a later
@@ -175,7 +175,7 @@ own state files:
   consumed rows is the accepted safe direction.
 - **Bootstrap:** fresh `init` initializes at the current memory head (zero
   for an empty DB) and seeds one persistent job. Updating an older install
-  does the same only when state is missing — no historical backfill, no
+  does the same only when state is missing, with no historical backfill, no
   context rendering during update.
 
 ## Testing

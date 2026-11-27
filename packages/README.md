@@ -2,7 +2,7 @@
 title: Packages
 ---
 
-Package reference for the `@justfortytwo/*` ecosystem — one page per package,
+Package reference for the `@justfortytwo/*` ecosystem, one page per package,
 documenting each at its current release. Install and configuration details
 also live in each package's own README; these pages describe what each
 package is, how it is built, and how it connects to its siblings.

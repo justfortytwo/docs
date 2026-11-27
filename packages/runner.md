@@ -14,7 +14,7 @@ agent framework.
 Both the scheduler (headless job turns) and the telegram bridge (live chat
 sessions) need to spawn and talk to Claude Code. runner is the single place
 that owns that process lifecycle and stream transport, so neither channel nor
-scheduler reinvents it — and neither depends on the other.
+scheduler reinvents it, and neither depends on the other.
 
 ## One-shot jobs
 
@@ -34,7 +34,7 @@ const result = await runner.run({
 and no `is_error` in Claude's JSON. Invalid JSON returns `ok: false`, the
 output as `text`, `raw: null`. Spawn failures reject with `RunnerSpawnError`;
 invalid input rejects with `TypeError`. Optional per-job `timeoutMs` is a
-**wall-clock** limit — a timeout returns `{ ok: false, text: '', raw: null }`
+**wall-clock** limit: a timeout returns `{ ok: false, text: '', raw: null }`
 after termination and cleanup.
 
 ## Persistent sessions
@@ -58,7 +58,7 @@ Guarantees and semantics:
 
 - Creation resolves on OS process spawn; `ready` means writable, not
   authenticated. `send(text)` resolves after the stdin write, **not** after a
-  response — listen for `result` to observe turn completion.
+  response. Listen for `result` to observe turn completion.
 - Concurrent sends serialize in invocation order; Claude controls processing
   of queued turns. Inputs sent mid-turn steer that turn (several inputs can
   share one `result`; the runner passes `--replay-user-messages` so `input`
@@ -76,7 +76,7 @@ Events:
 
 | Listener | Payload |
 | --- | --- |
-| `event` | `RunnerEvent` — discriminated union of all events |
+| `event` | `RunnerEvent`, a discriminated union of all events |
 | `raw` | Parsed Claude event, or original malformed line |
 | `assistant` | `{ type: 'assistant', text, raw }` for assistant text |
 | `result` | `RunResult` for each Claude result event |
@@ -85,7 +85,7 @@ Events:
 | `error` | `Error` |
 
 Errors always appear on `event`; a missing `error` listener does not trigger
-EventEmitter's fatal unhandled-error behavior. Events are live — never
+EventEmitter's fatal unhandled-error behavior. Events are live, never
 replayed or retained.
 
 ## Shutdown
@@ -95,7 +95,7 @@ replayed or retained.
 grace period; resolves after the parent process is reaped and output closed.
 Results may keep arriving during graceful shutdown; pipe draining after parent
 exit is bounded by the same grace. Only the parent Claude process is
-owned/signaled — descendants remain Claude's responsibility. No detached
+owned/signaled; descendants remain Claude's responsibility. No detached
 process, daemon, global session registry, or process-tree orchestration. The
 caller must keep its own process alive and close sessions during shutdown.
 
@@ -103,11 +103,11 @@ caller must keep its own process alive and close sessions during shutdown.
 
 `createRunner(defaults)` accepts:
 
-- `bin` — executable path; defaults to `CLAUDE_BIN` or `claude`.
-- `spawn` — injectable `child_process.spawn` for tests.
-- `cwd`, `env`, `args`, `resumeSessionId`, `shutdownGraceMs` — runtime
+- `bin`: executable path; defaults to `CLAUDE_BIN` or `claude`.
+- `spawn`: injectable `child_process.spawn` for tests.
+- `cwd`, `env`, `args`, `resumeSessionId`, `shutdownGraceMs`: runtime
   defaults.
-- `timeoutMs` — optional one-shot wall-clock limit.
+- `timeoutMs`: optional one-shot wall-clock limit.
 
 `claudeArgsFromEnv(env?)` reads operator-supplied Claude arguments from
 `FORTYTWO_CLAUDE_ARGS` (a JSON array of strings such as `["--chrome"]`) and
@@ -121,14 +121,14 @@ parent environment (defaults first, per-call last); caller objects are never
 mutated. The runner owns the format flags (`-p --input-format stream-json
 --output-format stream-json --verbose`; `--resume <id>` for resumption) and
 rejects conflicting format arguments. **No permission-bypass flags are added.**
-All other Claude configuration — including alternative compatible providers,
-via `env` such as `ANTHROPIC_BASE_URL` — passes through without provider
+All other Claude configuration (including alternative compatible providers,
+via `env` such as `ANTHROPIC_BASE_URL`) passes through without provider
 branches.
 
 ## Consumers
 
-- **`@justfortytwo/scheduler`** — headless one-shot job turns.
-- **`@justfortytwo/telegram`** — persistent interactive sessions per chat.
+- **`@justfortytwo/scheduler`**: headless one-shot job turns.
+- **`@justfortytwo/telegram`**: persistent interactive sessions per chat.
 
 ## Testing
 
@@ -136,8 +136,8 @@ branches.
 npm ci && npm test && npm run build
 ```
 
-Tests use a local fake executable and controlled streams — no Claude
-installation, API credentials, or network access required.
+Tests use a local fake executable and controlled streams. No Claude
+installation, API credentials, or network access is required.
 
 ## Scope
 

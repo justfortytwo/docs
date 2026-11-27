@@ -19,8 +19,8 @@ or through `@justfortytwo/installer`, which registers it in your project.
 
 An assistant without durable memory restarts from zero every session. memory
 gives the spine a single, local, queryable long-term store: what was learned,
-where it came from, and when — with corrections that keep history instead of
-silently overwriting it.
+where it came from, and when. Corrections keep history instead of silently
+overwriting it.
 
 ## What it stores
 
@@ -29,8 +29,8 @@ A memory is `content` plus provenance:
 | field | meaning |
 |-------|---------|
 | `content` | the text (embedded for recall) |
-| `source` | where it came from — free-form (`owner`, `web`, `tool:foo`) |
-| `observed` | how it was observed — free-form (`stated`, `inferred`, `imported`) |
+| `source` | where it came from, free-form (`owner`, `web`, `tool:foo`) |
+| `observed` | how it was observed, free-form (`stated`, `inferred`, `imported`) |
 | `date` | ISO date the memory pertains to (defaults to today, UTC) |
 | `tags` | free-form tags for filtering |
 | `supersedes` | id of a prior memory this one replaces (history is **kept**) |
@@ -144,7 +144,7 @@ EMBED_MODEL=qwen3-embedding:0.6b         # default model (1024-dim)
 ```
 
 If `EMBED_MODEL` is **unset**, the server falls back to a deterministic,
-dependency-free **`FakeEmbedder`** — for tests, CI, and first-run smoke checks
+dependency-free **`FakeEmbedder`**, for tests, CI, and first-run smoke checks
 with zero infra.
 
 Remote providers are opt-in via `EMBED_PROVIDER=openai`; only models that emit
@@ -154,7 +154,7 @@ Remote providers are opt-in via `EMBED_PROVIDER=openai`; only models that emit
 
 > **Switching models on an existing database:** two models with the same
 > dimension do **not** share a vector space. Stored vectors are not comparable
-> with new query vectors, and `recall` will not error — it will return
+> with new query vectors, and `recall` will not error: it will return
 > plausible but wrong neighbours. Re-embed with the library's
 > `reembed(h, embedder, id)` (one id at a time; no bulk command or MCP tool)
 > and re-run `reindex` for docs after switching.
@@ -188,35 +188,35 @@ import {
 } from '@justfortytwo/memory';
 ```
 
-- `openDb(path)` / `runMigrations(knex)` — open (WAL, `busy_timeout`) and
+- `openDb(path)` / `runMigrations(knex)`: open (WAL, `busy_timeout`) and
   migrate the database. `applyMigrations` runs a sibling's migration list.
-- `listUnnotifiedApprovals` / `markApprovalsNotified` — the approval outbox
-  (above). `countPendingApprovals` — the scheduler's `sweep` gate.
-- `store` / `recall` / `query` / `lexical` — same operations the MCP tools
+- `listUnnotifiedApprovals` / `markApprovalsNotified`: the approval outbox
+  (above). `countPendingApprovals` is the scheduler's `sweep` gate.
+- `store` / `recall` / `query` / `lexical`: same operations the MCP tools
   expose.
-- `deleteByIds(h, ids)` — hard-delete (row + vector + FTS). Intentionally a
+- `deleteByIds(h, ids)`: hard-delete (row + vector + FTS). Intentionally a
   **library API and NOT an MCP tool**: deletion is owner-privileged, and
   exposing it to the assistant's turn loop would let prompt-injected content
   trick it into erasing memories. Selecting which ids to remove is the
-  caller's job — see the installer's `forget`.
+  caller's job (see the installer's `forget`).
 - **Incremental reads:** `memoryHead(h)` returns `{ database, position }`
   using a persistent database identity and SQLite's AUTOINCREMENT high
   watermark (not timestamps or `MAX(id)`). `memoryDelta(h, cursor, limit)`
   returns ascending insertion pages, includes superseded rows as evidence,
   never skips unreturned rows; deleted-id gaps remain safe; invalid or
-  backwards cursors fail closed. Library APIs only — the MCP tool contract
+  backwards cursors fail closed. Library APIs only; the MCP tool contract
   is unchanged.
 
 ## Continuous enrichment
 
 `enrich(h, embedder, candidates)` folds a batch of candidate memories into the
 store: drops low-salience candidates, **dedupes** near-duplicates by meaning,
-and writes the survivors with provenance — honoring an explicit `supersedes`
+and writes the survivors with provenance, honoring an explicit `supersedes`
 to replace a stale belief. `enrichFromTurn(h, embedder, turn, extractor)` runs
 an injected `SalienceExtractor` and feeds its candidates to `enrich`.
 
 The salience extractor itself is model-driven and lives in the sibling
-**`@justfortytwo/salience`** — memory owns only the dedupe + write, never the
+**`@justfortytwo/salience`**. Memory owns only the dedupe + write, never the
 model call.
 
 ## Peer seams
@@ -224,12 +224,12 @@ model call.
 memory depends on two sibling packages **one-directionally** (optional peers,
 no cycle):
 
-- **`@justfortytwo/gate`** — memory ships `GateApprovalStore`
+- **`@justfortytwo/gate`**: memory ships `GateApprovalStore`
   (`src/gate-approval-store.ts`), a durable SQLite-backed implementation of
   gate's `ApprovalStore` + `AuditLogger` interfaces. Pass it to gate's
   `decide(..., { store, audit })` to back the safety gate's one-shot approvals
   with memory's db instead of gate's standalone JSONL store.
-- **`@justfortytwo/salience`** — the model-driven salience extractor injected
+- **`@justfortytwo/salience`**: the model-driven salience extractor injected
   into `enrichFromTurn`.
 
 ## Running it

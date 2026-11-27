@@ -1,4 +1,4 @@
-# AGENTS.md — justfortytwo/docs
+# AGENTS.md: justfortytwo/docs
 
 Guidance for AI coding agents working in this repository.
 
@@ -6,7 +6,7 @@ Guidance for AI coding agents working in this repository.
 
 Canonical, publishable **design and architecture documentation** for
 **fortytwo**, a local-first personal-assistant spine distributed as the
-`@justfortytwo/*` npm packages. It holds the *cross-cutting* design — decisions
+`@justfortytwo/*` npm packages. It holds the *cross-cutting* design: decisions
 and contracts that span packages. Package-specific install/config docs live in
 each package's own README, not here.
 
@@ -42,7 +42,7 @@ npm run build    # static site into .vuepress/dist/
 ```
 
 Verify changes by reading the rendered Markdown (dev server or GitHub) and
-checking relative links — the build warns about broken links.
+checking relative links. The build warns about broken links.
 
 ## Conventions (observed in existing docs)
 
@@ -102,7 +102,7 @@ checking relative links — the build warns about broken links.
   the source of truth. When
   documenting current behavior, verify against the sibling package source
   rather than trusting this doc; when editing, keep it framed as a design doc.
-- Don't move package install/config instructions here — they belong in each
+- Don't move package install/config instructions here. They belong in each
   package's README.
 - Don't invent decisions: this repo is the record of agreed design. Mark open
   questions explicitly rather than stating them as settled.
@@ -110,7 +110,7 @@ checking relative links — the build warns about broken links.
 ## Sibling repos (in `../`, each its own git repo)
 
 `gate`, `installer`, `marketplace`, `memory`, `persona`, `runner`, `salience`,
-`scheduler`, `telegram` — the `@justfortytwo/*` packages this repo documents —
+`scheduler`, `telegram` (the `@justfortytwo/*` packages this repo documents),
 plus `website` (Nuxt site, `justfortytwo-website`). Most siblings have their own
 `CLAUDE.md`/`AGENTS.md`; read those for package-level conventions. Only edit
 this repo unless explicitly asked to change a sibling.

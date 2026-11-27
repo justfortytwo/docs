@@ -1,7 +1,7 @@
 # Scheduler & Durable Jobs
 
-This is the design for fortytwo's **scheduler** — the subsystem that runs work on
-a clock and on demand without a human in the loop. It implements two spine items
+This is the design for fortytwo's **scheduler**, the subsystem that runs work on a
+clock and on demand without a human in the loop. It implements two spine items
 from [Design Principles](./design-principles.md): **durable jobs** and **Pulse**
 (proactive wakes). It replaced the proactive-wake loop that used to live inside
 the Telegram bridge. This is the design record; the shipped behavior of the
@@ -15,7 +15,7 @@ Before the scheduler, the proactive-wake scheduler was embedded in the Telegram 
 1. **Coupled to one channel.** No bridge running ⇒ no wakes. The assistant
    cannot do anything proactively unless Telegram is up.
 2. **Wakes always spend tokens.** A scheduled wake fires a full LLM turn
-   unconditionally — the afternoon "open-thread sweep" runs even when there are
+   unconditionally: the afternoon "open-thread sweep" runs even when there are
    zero pending approvals and nothing to report. That is pure waste.
 
 And there was no durable **one-off** job queue at all: the deferred-jobs runner
@@ -39,33 +39,33 @@ through one mechanism.
   (the transcript when `@justfortytwo/transcript` is installed; otherwise
   dropped); channels (Telegram today, others later) are *optional notifiers*,
   never a dependency.
-- **One mechanism for every job shape** — recurring, one-off, and reactive jobs
+- **One mechanism for every job shape.** Recurring, one-off, and reactive jobs
   are all rows in the same table, drained by the same loop.
 
 ## Architecture
 
 Four packages, each with one job:
 
-- **`@justfortytwo/scheduler`** *(new)* — the daemon. A long-running process
+- **`@justfortytwo/scheduler`** *(new)*: the daemon. A long-running process
   (managed by the installer, like the bridge) built from:
   - [`croner`](https://www.npmjs.com/package/croner) for cron parsing and
     next-fire computation,
-  - a **cheap ~30s catch-all poll** that calls `claimDue(now)` — a single
-    indexed SQL query, **zero tokens** — so jobs enqueued by other processes are
+  - a **cheap ~30s catch-all poll** that calls `claimDue(now)` (a single
+    indexed SQL query, **zero tokens**), so jobs enqueued by other processes are
     picked up without any IPC,
   - [`p-queue`](https://www.npmjs.com/package/p-queue) with **concurrency 1** to
     serialize LLM turns (they resume per-conversation sessions and must not
     overlap),
   - a **handler registry** keyed by job `kind`.
-- **`@justfortytwo/runner`** *(new, tiny)* — the shared headless invocation,
+- **`@justfortytwo/runner`** *(new, tiny)*: the shared headless invocation,
   `claude -p --output-format json`. Both the scheduler and the Telegram bridge
   depend on it; neither depends on the other. (The bridge's `runClaude` moves
   here.)
-- **`@justfortytwo/memory`** — provides the database handle (`openDb`) and the
+- **`@justfortytwo/memory`** provides the database handle (`openDb`) and the
   locked migration runner (`applyMigrations`) the scheduler's own migration
   uses. It owns the `approvals` table, which doubles as an **outbox** the
   scheduler polls (see [Event hooks](#event-hooks-reactive-jobs)).
-- **`@justfortytwo/telegram`** — loses the embedded `schedulerLoop` /
+- **`@justfortytwo/telegram`** loses the embedded `schedulerLoop` /
   `SCHEDULES` / `state.fired`; gains a **Telegram notifier** the scheduler
   delivers through, plus the event-enqueue call-sites it owns.
 
@@ -141,32 +141,32 @@ Each is small and independently testable.
   against a file database.
 - **Handler registry** (in `scheduler`): each `kind` registers
   `{ hasWork?(ctx), run(ctx) }`.
-  - `hasWork` is the **cheap, non-LLM gate** — a pure DB query. Absent ⇒ the job
+  - `hasWork` is the **cheap, non-LLM gate**: a pure DB query. Absent ⇒ the job
     always runs.
   - `run` does the work: fires an LLM turn via the runner, or does pure work
     (e.g. `reembed_memory`, kept for jobs queued by older installs).
-- **`tick(now)`** — the pure heart of the loop, dependency-injected so it tests
+- **`tick(now)`**: the pure heart of the loop, dependency-injected so it tests
   without a network or an LLM. For each claimed-due job: evaluate `hasWork`; if
   false, `complete(skipped)` + reschedule (**0 tokens**); if true, push `run`
   onto the p-queue; on completion, notify and (if recurring) reschedule.
-- **`daemon`** — the only impure part. Wires croner + the ~30s poll + the real
+- **`daemon`**: the only impure part. Wires croner + the ~30s poll + the real
   job API + the approval outbox + the runner + the notifier.
-- **`Notifier`** interface — `notify(result)`. The default appends to the
+- **`Notifier`** interface: `notify(result)`. The default appends to the
   **conversation log** (the transcript when `@justfortytwo/transcript` is
   installed; otherwise dropped). An optional **Telegram notifier** (push to the
   owner chat) is injected only when configured.
 
-## Job kinds — one table, four uses
+## Job kinds: one table, four uses
 
 | Use | Example | `recurrence` | Gate (`hasWork`) |
 | --- | --- | --- | --- |
-| Built-in recurring | `daily_briefing`, `sweep`, `learn_review` | cron | yes — skip if nothing to do |
+| Built-in recurring | `daily_briefing`, `sweep`, `learn_review` | cron | yes, skip if nothing to do |
 | User-defined recurring | "check my emails every morning" | cron | optional (default: always run) |
 | One-off durable | `reminder` | `NULL` | optional |
-| Reactive (event-driven) | `reply`; `notify_pending` (run by the approval outbox, not queued) | `NULL` | inherent — only runs when real |
+| Reactive (event-driven) | `reply`; `notify_pending` (run by the approval outbox, not queued) | `NULL` | inherent, only runs when real |
 
 User-defined recurring jobs generalize the built-ins: a cron string plus a
-trigger prompt. This is why external adapters (calendar, email) can wait — they
+trigger prompt. This is why external adapters (calendar, email) can wait. They
 are absorbed for now by recurring prompts that use whatever tools/skills the
 assistant has that turn. As shipped, the assistant creates them only as
 `reminder` rows, one-off or with a cron, through its [job
@@ -220,9 +220,9 @@ installer only asks and writes it):
 
 Only on/off and the zone are configurable; custom per-job times are not.
 
-## Token-gating — the core guarantee
+## Token-gating: the core guarantee
 
-Every recurring job carries a pure-DB `hasWork` predicate — e.g.
+Every recurring job carries a pure-DB `hasWork` predicate, e.g.
 `sweep.hasWork = pendingApprovals > 0 || unansweredThreads > 0`. When it returns
 false the job is marked `skipped` and rescheduled with **no LLM turn and zero
 tokens**. The poll, the claim, the gate, and the recurrence math are all free.
@@ -251,12 +251,12 @@ an approval is announced through the outbox instead. The `reembed_memory`
 handler stays for jobs queued by older installs; nothing enqueues it.
 
 Because producers are **separate processes** and SQLite has no pub/sub, the
-daemon notices newly-enqueued jobs through the **cheap ~30s `claimDue` poll** —
-no IPC, no signalling, and (because it never calls the LLM) no token cost.
+daemon notices newly-enqueued jobs through the **cheap ~30s `claimDue` poll**,
+with no IPC, no signalling, and (because it never calls the LLM) no token cost.
 Latency is at most the poll interval (tunable). Croner is retained for precise
 recurrence math, not as the sole wake source.
 
-Reactive jobs have **no `hasWork` gate** — being enqueued *is* the signal that
+Reactive jobs have **no `hasWork` gate**. Being enqueued *is* the signal that
 there is work, so they always run. De-duplication therefore happens at the
 **enqueue site**: a producer must not enqueue a second job of the same kind for
 the same target while one is still `pending`/`running` (the bridge checks
@@ -322,16 +322,16 @@ bridge. The four schedules become seeded recurring jobs in the table. The bridge
 keeps its poll loop and gains (a) a Telegram notifier the scheduler delivers
 through, and (b) its event-enqueue call-sites. Schedule logic now lives in
 exactly one place, so there is no double-firing. If the daemon is not running,
-nothing proactive fires — this is documented, and the bridge still serves
+nothing proactive fires. This is documented, and the bridge still serves
 interactive messages.
 
 ## Crash-safety & errors
 
 - **Single writer of the `running` transition.** Producers only ever
   `INSERT … status='pending'`; the daemon is the only process that claims. So
-  `claimDue` is one statement —
-  `UPDATE jobs SET status='running', updated_at=… WHERE status='pending' AND run_at <= now RETURNING *`
-  — with the database in **WAL** mode. There is no cross-process race on the
+  `claimDue` is one statement, run with the database in **WAL** mode:
+  `UPDATE jobs SET status='running', updated_at=… WHERE status='pending' AND run_at <= now RETURNING *`.
+  There is no cross-process race on the
   claim itself; the only cross-process interaction is the poll noticing new
   `pending` inserts, which is the intended behavior. `cancel_job` (another
   process) changes only `pending` rows, in one UPDATE, so a row the daemon
@@ -340,7 +340,7 @@ interactive messages.
   than `STALE_RUNNING_MS` (default **15 min**, a config constant) are returned to
   `pending` so they re-run.
 - **Failures.** Increment `attempts`, store `last_error`, and retry with a fixed
-  MVP schedule — **3 attempts** at **1 min → 5 min → 30 min**. After the cap the
+  MVP schedule: **3 attempts** at **1 min → 5 min → 30 min**. After the cap the
   row is marked `failed` and a note is written to the conversation log (the
   transcript when installed; otherwise dropped). (A tunable backoff policy is
   deferred.)
@@ -349,8 +349,8 @@ interactive messages.
 ## Testing
 
 - Job API (in `scheduler`): `claimDue` atomicity, `complete`/`fail`,
-  reschedule, `cancel` — against a file database.
-- `tick()` (in `scheduler`): pure, with a fake store + a DI'd registry —
+  reschedule, `cancel`, against a file database.
+- `tick()` (in `scheduler`): pure, with a fake store + a DI'd registry:
   gate-skips-without-LLM, gate-runs-with-work, recurring reschedule, one-off
   completion, failure/backoff. No network, no LLM.
 - Thin croner + p-queue wiring smoke test.
