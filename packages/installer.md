@@ -7,7 +7,7 @@ adapters, embedder). One package ships two bins:
 - **`create-fortytwo`**: the install-time alias; with no verb it runs `init`.
 - **`fortytwo`**: the everyday lifecycle alias.
 
-- **Version:** `1.1.2` · **Runtime:** one-shot CLI · **Node:** >= 20
+- **Version:** `1.1.3` · **Runtime:** one-shot CLI · **Node:** >= 20
   (20/22 LTS recommended, for `better-sqlite3` prebuilds)
 
 ## Why this exists
@@ -62,7 +62,7 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `enrich` | Not implemented yet: the command exits with an error. |
 | `onboard` | Review and save the owner profile drafted by persona's `onboarding` skill (see [Owner onboarding](#owner-onboarding)). Shows each change with its source and saves only what the owner confirms in a terminal. `--dry-run` only shows; `--draft <path>` reviews another file. |
 | `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until`, previewed and confirmed (or `--yes`). `--limit` caps matches (default 50); `--db-path` picks the DB. Owner-only: deletes via the memory library API, never exposed to the assistant. |
-| `unbind` | Remove channel bindings from `.fortytwo/identity.json` (`--chat-id <id>` or `--all`, optionally `--channel <name>`) and print the chat ids to remove from `ALLOWED_CHAT_IDS` in `.env` by hand. It does not edit `.env` and does not revoke a chat paired with `fortytwo pair` (the bridge's bindings db is untouched). |
+| `unbind` | Revoke a chat (`--chat-id <id>` or `--all`, optionally `--channel <name>`). It removes the chat from the bridge's bindings db, so a chat paired with `fortytwo pair` is refused from its next message without a restart, and from `.fortytwo/identity.json`. `--all` also cancels pairing codes that have not been used yet. It does not edit `.env`: an id still in `ALLOWED_CHAT_IDS` keeps access, and unbind names it so you can remove it there and restart. |
 | `gate` | Show or change the optional safety gate: `gate on` holds outward and destructive actions for approval, `gate off` removes it. Off by default; restart Fortytwo to apply. See [The safety gate](#the-safety-gate-optional). |
 | `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking; `--timezone <IANA name\|utc>` sets the zone the built-in times (and Oneiros) are read in, and `--list` prints it (`Times are in <zone>`). `--timezone` with a name that is not a time zone exits 2 and saves nothing. In a terminal it also asks for the zone; an answer that is not a time zone keeps the current one. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
 
