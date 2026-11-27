@@ -115,7 +115,8 @@ installer migrates existing chat rows out.
 ## Data model
 
 SQLite via `better-sqlite3` + `knex` migrations (`src/migrations/`, applied by
-`fortytwo-memory-migrate` / `npm run migrate`):
+`npm run migrate`, which runs `node dist/migrate.js`, and automatically when
+`fortytwo-memory` starts):
 
 | migration | creates |
 |-----------|---------|
@@ -150,7 +151,17 @@ with zero infra.
 Remote providers are opt-in via `EMBED_PROVIDER=openai`; only models that emit
 (or truncate to) 1024 dims are accepted (`text-embedding-3-small/large`,
 `voyage-3-large`, `BAAI/bge-m3`, `Qwen/Qwen3-Embedding-0.6B`). Any other
-`EMBED_MODEL` fails at startup with the accepted list.
+`EMBED_MODEL` fails at startup with the accepted list. `EMBED_PROVIDER`
+values other than `ollama` (default) and `openai` also fail at startup.
+
+```bash
+EMBED_PROVIDER=openai
+EMBED_BASE_URL=...   # default per model: OpenAI or Voyage API; required
+                     # for the self-hosted BAAI/bge-m3 and Qwen models
+EMBED_API_KEY=...    # sent as a Bearer token when set
+```
+
+The database path comes from `DB_PATH` (default `./memory.db`).
 
 > **Switching models on an existing database:** two models with the same
 > dimension do **not** share a vector space. Stored vectors are not comparable
@@ -174,7 +185,7 @@ its old name through `applyMigrations`, so existing databases skip it.
   `markApprovalsNotified(h, ids, at)`. Approvals still pending when migration
   006 runs are announced once more.
 
-Upgrade memory together with scheduler 2.0.0: scheduler 1.0.7 and earlier
+Upgrade memory together with scheduler >= 2.0.0: scheduler 1.0.7 and earlier
 import the job API from memory and fail to load.
 
 ## Library API
@@ -187,6 +198,13 @@ import {
   listUnnotifiedApprovals, markApprovalsNotified, countPendingApprovals,
 } from '@justfortytwo/memory';
 ```
+
+Also exported: `query`, `lexical`, `recallDocs`, `reindex`, `exportRange`,
+`reembed`, `GateApprovalStore`, `loadExtensions`, `createServer`,
+`startServer`, `toolDefinitions`, `EMBED_DIM`, `FakeEmbedder`,
+`OpenAICompatEmbedder`, `KNOWN_1024_MODELS`, `vecToBuffer`, and the contract
+constants (`MEMORY_TOOL_CONTRACT_VERSION`, `MEMORY_SERVER_ID`,
+`MEMORY_MCP_TOOLS`, `memoryToolContract`).
 
 - `openDb(path)` / `runMigrations(knex)`: open (WAL, `busy_timeout`) and
   migrate the database. `applyMigrations` runs a sibling's migration list.
@@ -204,8 +222,9 @@ import {
   watermark (not timestamps or `MAX(id)`). `memoryDelta(h, cursor, limit)`
   returns ascending insertion pages, includes superseded rows as evidence,
   never skips unreturned rows; deleted-id gaps remain safe; invalid or
-  backwards cursors fail closed. Library APIs only; the MCP tool contract
-  is unchanged.
+  backwards cursors fail closed. `limit` defaults to 50 and must be 1..200,
+  otherwise it throws. Library APIs only; the MCP tool contract is
+  unchanged.
 
 ## Continuous enrichment
 
@@ -243,15 +262,18 @@ DB_PATH=./memory.db EMBED_MODEL=qwen3-embedding:0.6b fortytwo-memory
 
 Register in any MCP host via `.mcp.json` (`command: "npx"`,
 `args: ["-y", "@justfortytwo/memory"]`). It is not a Claude Code plugin: the
-installer writes this entry for you, with the transcript extension when
-`@justfortytwo/transcript` is installed.
+installer writes this entry for you. When `@justfortytwo/transcript` is
+installed, the entry becomes `args: ["-y", "-p", "@justfortytwo/memory",
+"-p", "@justfortytwo/transcript", "fortytwo-memory"]` with
+`env.FORTYTWO_MCP_EXTENSIONS` set to `@justfortytwo/transcript`.
 
 ## Testing
 
 ```bash
 npm test                # vitest run
-RUN_OLLAMA_TESTS=1 ...  # opt-in live-Ollama embedder test
 ```
+
+There is no live-Ollama test today: the embedder tests stub `fetch`.
 
 ## Scope
 

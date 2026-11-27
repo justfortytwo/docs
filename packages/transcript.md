@@ -7,7 +7,8 @@ only facts. It is a library: no bin, no server. The agent reaches it through
 tools added to the existing `fortytwo-memory` MCP server.
 
 - **Version:** `1.0.1` (accepts memory 2.x; no other change) · **Runtime:**
-  library (loaded by memory, telegram, scheduler, persona and the installer) ·
+  library (loaded by memory, telegram, scheduler and the installer; persona
+  receives the transcript as an injected source) ·
   **Node:** >= 20
 - Design record: `superpowers/specs/2026-10-27-transcript-design.md` and the
   matching plan in `superpowers/plans/` (kept in this repo, not published on
@@ -69,8 +70,11 @@ names it does not know).
 | `transcript_identity` | stable database id used by delta cursors |
 
 Migrations: `transcript_001_init`, `transcript_002_fts`,
-`transcript_003_identity`. The vec0 table is created on the raw handle by
-`prepareTranscript(h)` (idempotent), as memory does for its own vec tables.
+`transcript_003_identity` (exported as `TRANSCRIPT_MIGRATIONS`).
+`prepareTranscript(h)` (idempotent) creates the vec0 table on the raw handle,
+as memory does for its own vec tables, then applies these migrations through
+memory's `applyMigrations`. Call it before `createTranscript`, which prepares
+statements against the tables.
 
 ## Writing
 
@@ -108,6 +112,9 @@ served as `mcp__fortytwo-memory__<tool>`:
   not missed.
 - **Context scope.** Neighbours come from the same `thread_id`; when the hit
   has no thread id, from the same channel by id order.
+- **Results.** `transcript_search` returns `{ hits }`; `transcript_context`
+  returns `{ rows }` (empty for an unknown id). A missing required input
+  returns `{ error: 'text is required' }` or `{ error: 'id is required' }`.
 - **Contract.** The tools are additive: memory's
   `MEMORY_TOOL_CONTRACT_VERSION` is unchanged. transcript lists its own tool
   names in `@justfortytwo/transcript/contract`
@@ -120,7 +127,8 @@ served as `mcp__fortytwo-memory__<tool>`:
 semantics as memory's `memoryHead` / `memoryDelta`: a `{ database, position }`
 cursor built from a persistent database identity and SQLite's AUTOINCREMENT
 high watermark (not `MAX(id)`), so it survives deletion of the newest rows. A
-cursor from another database, or beyond head, throws. persona consumes this as
+cursor from another database, or beyond head, throws, as does a `limit`
+outside 1..200. persona consumes this as
 its second evidence stream (see [persona](./persona.md#oneiros)).
 
 ## Migration
@@ -135,10 +143,12 @@ move is safe to re-run (details in [installer](./installer.md#chat-migration)):
 - Mapping: Telegram rows take actor, direction and kind from `source` and
   `meta`, thread id from `meta.thread_id` (null if absent). Scheduler rows
   become channel `scheduler`, outbound, kind = the second tag.
-- The installer verifies counts before it removes anything from memory;
-  removal uses the owner-privileged `deleteByIds`, in one transaction.
-- The installer initializes persona's transcript cursor so Oneiros neither
-  reprocesses consumed history nor skips unconsumed messages.
+- Before it removes anything from memory, the installer verifies that every
+  moved row exists in the transcript with identical content; removal uses the
+  owner-privileged `deleteByIds`, in one transaction.
+- The installer initializes persona's transcript cursor so Oneiros never
+  skips unconsumed messages. When live rows precede migrated ones, it may
+  re-read some already-consumed rows (the safe direction).
 
 ## Consequences
 

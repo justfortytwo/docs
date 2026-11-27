@@ -45,6 +45,9 @@ the filesystem, the memory and the transcript, not the live conversation.
 
 `fortytwo start` runs in the foreground on purpose, so the container runtime owns
 restarts and logs (see [installer](./packages/installer.md#running-as-a-service)).
+Arguments after `--` (`fortytwo start -- --chrome`) go to Claude Code on every
+chat and scheduled run; `FORTYTWO_CLAUDE_ARGS` (a JSON array) in `.env` does
+the same, and the command line wins.
 
 ## Persistence
 
@@ -84,7 +87,7 @@ Then, from the interactive container:
 podman exec -it claude-code bash
 claude                         # log in once; the login is shared via claude_config
 cd /workspace
-npx create-fortytwo init       # same as `fortytwo init`; interactive
+npx @justfortytwo/installer init   # interactive; afterwards `npx fortytwo` works
 npx fortytwo doctor            # should report "healthy"
 exit
 ```
@@ -93,9 +96,14 @@ Start the runtime and pair Telegram:
 
 ```bash
 podman-compose -f compose.yaml up -d fortytwo
-podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo pair'
+podman exec -it fortytwo bash -lc 'cd /workspace && npx fortytwo pair'
 # prints a code; send `/login <code>` to your bot from the chat you want to link
 ```
+
+`pair` prints a code only when it sees the live `fortytwo start` runtime, and it
+identifies that process by PID and PID namespace. The runtime lives in the
+`fortytwo` container, so run `pair` there. From `claude-code` it reports
+"Telegram is not running"; `npx fortytwo pair --force` there is the fallback.
 
 ### What `init` does
 
@@ -110,14 +118,19 @@ podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo pair'
    `agent_name`, `owner_name`, `owner_role`, `owner_positioning`,
    `owner_identity_summary`, `owner_values`, `owner_expertise`,
    `owner_boundaries`, `owner_voice_tone`. For non-interactive runs use `--yes`
-   with `--answers file.json`, or `FORTYTWO_<KEY>` variables.
-4. Writes secrets and `ALLOWED_CHAT_IDS` to `.env` (passed with
-   `--telegram-bot-token` / `--allowed-chat-ids` or env, never prompted) and wires
+   with `--answers file.json`, or `FORTYTWO_<KEY>` variables. Other flags:
+   `--ollama-base-url`, `--db-path`, `--schedules all|none|<job,job>`.
+4. Writes secrets and `ALLOWED_CHAT_IDS` to `.env` (from
+   `--telegram-bot-token` / `--allowed-chat-ids` or env; an interactive run also
+   offers to ask for them, blank skips) and wires
    the `fortytwo-memory` entry in `.mcp.json`, including the transcript tools,
    plus the `fortytwo-scheduler` entry (the assistant's reminder tools, same
    `DB_PATH`).
-5. Renders the persona (`CLAUDE.md` + `context/*`) from your answers. Rendering
-   is idempotent and never overwrites what you edited by hand.
+5. Renders the persona (`CLAUDE.md` + `context/*`) from your answers. Captured
+   files (`OWNER.md`, `PROFILE.md`, `SOUL.md`, `rules/`, the memory corpus) are
+   never overwritten once they exist; `CLAUDE.md` and the `INDEX.md` files are
+   re-rendered on every `init`. It also copies the persona skills into
+   `.claude/skills/`.
 6. Checks the embedding model on the Ollama server (pulling it if missing),
    migrates the database and records the installed version set in
    `.fortytwo/state.json`, which `rollback` uses.
@@ -154,8 +167,8 @@ generates no answers.
   fine for tests, useless for real recall.
 - An OpenAI-compatible remote provider is supported (`EMBED_PROVIDER=openai`);
   the setup behind this guide does not use it and it is untested here.
-- If Ollama is unreachable, `init` and `doctor` fail the embedder check. Start it
-  before fortytwo.
+- If Ollama is unreachable, `init` and `doctor` only warn (recall degrades;
+  `doctor` still reports healthy). Start it before fortytwo.
 
 ## Verify the transcript
 
@@ -186,7 +199,11 @@ Do not re-run `init` for this on a working install: it asks for your identity
 again. `fortytwo schedules` touches only `.fortytwo/schedules.json`.
 
 The scheduler reads built-in times in UTC unless you set a time zone (briefing
-07:57, sweep 13:03 and 18:03, learn-review Sundays 09:17, Oneiros 03:17):
+07:57, sweep 13:03 and 18:03, learn-review Sundays 09:17, Oneiros 03:17). `init`
+saves `owner_timezone` as that zone when it is not UTC, but never prompts for
+it (default `UTC`): pass `--owner-timezone` or `FORTYTWO_OWNER_TIMEZONE`, or
+set it later. Interactive `fortytwo schedules` also asks for the zone;
+`--list` only shows, `--set all|none|<job,job>` sets without asking.
 
 ```bash
 podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo schedules --timezone Europe/Rome'
@@ -207,7 +224,9 @@ podman exec -it claude-code bash -lc 'cd /workspace && npx fortytwo gate on'
 podman restart fortytwo
 ```
 
-A held action then shows up in the paired chat with Approve / Deny buttons.
+A held action then shows up in the paired chat with Approve / Deny buttons
+(with the gate on, `fortytwo start` sets `TELEGRAM_APPROVALS=1` unless `.env` or
+the shell sets it, e.g. to `0`).
 `npx fortytwo gate` shows the state and `npx fortytwo gate off` (plus a restart)
 removes it. Tune what is held in `/workspace/.claude/policy/capabilities.toml`
 and which Bash commands run freely in `/workspace/rules/bash-allowlist.jsonl`.
@@ -301,9 +320,9 @@ podman exec -it claude-code bash -lc \
 
 On an installation that predates the transcript, `update`:
 
-1. installs `@justfortytwo/transcript` and re-wires **only** the
-   `fortytwo-memory` entry of `.mcp.json` (other servers, such as WhatsApp,
-   are left as they are);
+1. installs `@justfortytwo/transcript` and re-wires **only** fortytwo's own
+   entries of `.mcp.json` (`fortytwo-memory`, `fortytwo-scheduler`); other
+   servers, such as WhatsApp, are left as they are;
 2. moves the chat rows (Telegram messages and scheduler notifications) out of
    memory into the transcript, verifying each copy before deleting the
    original. It prints `moved N chat row(s) from memory to the transcript`;

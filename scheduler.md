@@ -53,8 +53,8 @@ Four packages, each with one job:
     indexed SQL query, **zero tokens**), so jobs enqueued by other processes are
     picked up without any IPC,
   - [`p-queue`](https://www.npmjs.com/package/p-queue) with **concurrency 1** to
-    serialize LLM turns (they resume per-conversation sessions and must not
-    overlap),
+    serialize LLM turns so they never overlap (as built, each scheduled turn is
+    a fresh `claude -p` run; none resumes a session),
   - a **handler registry** keyed by job `kind`.
 - **`@justfortytwo/runner`** *(new, tiny)*: the shared headless invocation,
   `claude -p --output-format json`. Both the scheduler and the Telegram bridge
@@ -113,7 +113,7 @@ jobs(
   payload     text,               -- JSON, job-specific arguments
   run_at      text    not null,   -- ISO timestamp: when it is due
   recurrence  text,               -- cron string; NULL = one-off
-  status      text    not null,   -- 'pending' | 'running' | 'done' | 'failed' | 'skipped' | 'cancelled'
+  status      text    not null,   -- 'pending' | 'running' | 'done' | 'failed' | 'cancelled'
   attempts    integer not null default 0,
   last_error  text,
   created_at  text    not null,
@@ -125,7 +125,10 @@ jobs(
 `recurrence = NULL` ⇒ one-off: terminal `done` (or `failed`) after it runs.
 `recurrence` set ⇒ recurring: after each run (or skip) the daemon computes the
 next `run_at` via croner and **resets the row to `pending`**, so `claimDue`
-selects it again at its next slot. A recurring row is never terminal.
+selects it again at its next slot. The design called a recurring row never
+terminal. As built, it ends when it fails 3 times in a row (`failed`), is
+retired (`done`) or is cancelled; a built-in kind gets a fresh row at the next
+boot. No `skipped` status is written: a skip is a plain `complete`.
 
 ## Components
 
@@ -146,8 +149,9 @@ Each is small and independently testable.
     (e.g. `reembed_memory`, kept for jobs queued by older installs).
 - **`tick(now)`**: the pure core of the loop, dependency-injected so it tests
   without a network or an LLM. For each claimed-due job: evaluate `hasWork`; if
-  false, `complete(skipped)` + reschedule (**0 tokens**); if true, push `run`
-  onto the p-queue; on completion, notify and (if recurring) reschedule.
+  false, `complete` + reschedule (**0 tokens**; a one-off becomes `done`); if
+  true, push `run` onto the p-queue; on completion, notify and (if recurring)
+  reschedule.
 - **`daemon`**: the only impure part. Wires croner + the ~30s poll + the real
   job API + the approval outbox + the runner + the notifier.
 - **`Notifier`** interface: `notify(result)`. The default appends to the
@@ -159,7 +163,7 @@ Each is small and independently testable.
 
 | Use | Example | `recurrence` | Gate (`hasWork`) |
 | --- | --- | --- | --- |
-| Built-in recurring | `daily_briefing`, `sweep`, `learn_review` | cron | yes, skip if nothing to do |
+| Built-in recurring | `daily_briefing`, `sweep`, `learn_review` | cron | `sweep` and `learn_review`: skip if nothing to do; `daily_briefing` always runs |
 | User-defined recurring | "check my emails every morning" | cron | optional (default: always run) |
 | One-off durable | `reminder` | `NULL` | optional |
 | Reactive (event-driven) | `reply`; `notify_pending` (run by the approval outbox, not queued) | `NULL` | inherent, only runs when real |
@@ -176,15 +180,18 @@ tools](#agent-job-tools).
 1. **Boot.** Read the owner's choice (see [Owner-selectable
    built-ins](#owner-selectable-built-ins)). Retire the recurring rows of
    disabled kinds, then seed the enabled built-ins (briefing, sweep,
-   learn-review, Oneiros), keyed by `kind` (one active recurring row per
+   learn-review), then Oneiros when persona's checkpoint
+   (`.fortytwo/oneiros/checkpoint.json`) exists; Oneiros is not switchable in
+   `schedules.json`. Seeding is keyed by `kind` (one active recurring row per
    built-in). The code definition is **authoritative for built-ins**: if a
    built-in's cron string changed in code, the daemon updates its row's
    `recurrence`/`run_at`. User-defined jobs are DB-authoritative and never
    overwritten from code. Finally, realign recurring rows to the configured
    time zone.
-2. **Loop.** Every ~30s (and via croner for precise recurrence), call
-   `tick(now)`: `claimDue` → per job, gate → *skip + reschedule* or *run on the
-   p-queue* → notify + reschedule.
+2. **Loop.** Every ~30s, call `tick(now)`: `claimDue` → per job, gate →
+   *skip + reschedule* or *run on the p-queue* → notify + reschedule. The
+   design also had croner wake the loop; as built, the poll is the only wake
+   source, so a job fires up to one poll period after its `run_at`.
 3. **Reschedule.** After a recurring job runs (or is skipped), the daemon
    computes the next `run_at` from `recurrence` and writes it back.
 
@@ -222,9 +229,11 @@ Only on/off and the zone are configurable; custom per-job times are not.
 
 ## Token-gating: the core guarantee
 
-Every recurring job carries a pure-DB `hasWork` predicate, e.g.
-`sweep.hasWork = pendingApprovals > 0 || unansweredThreads > 0`. When it returns
-false the job is marked `skipped` and rescheduled with **no LLM turn and zero
+The design gave every recurring job a pure-DB `hasWork` predicate, e.g.
+`sweep.hasWork = pendingApprovals > 0 || unansweredThreads > 0`. As built,
+`sweep` checks `pendingApprovals > 0` only, `learn_review` checks for memories
+from the last 7 days, and `daily_briefing` has no gate. When a gate returns
+false the job is completed and rescheduled with **no LLM turn and zero
 tokens**. The poll, the claim, the gate, and the recurrence math are all free.
 The *only* token cost in the system is a `run` whose gate has already passed.
 
@@ -253,8 +262,8 @@ handler stays for jobs queued by older installs; nothing enqueues it.
 Because producers are **separate processes** and SQLite has no pub/sub, the
 daemon notices newly-enqueued jobs through the **cheap ~30s `claimDue` poll**,
 with no IPC, no signalling, and (because it never calls the LLM) no token cost.
-Latency is at most the poll interval (tunable). The daemon keeps croner for
-precise recurrence math, not as the sole wake source.
+Latency is at most the poll interval (`POLL_MS`, a constant). As built, croner
+only computes next run times; it is not a wake source.
 
 Reactive jobs have **no `hasWork` gate**. Being enqueued *is* the signal that
 there is work, so they always run. De-duplication therefore happens at the
@@ -340,10 +349,11 @@ interactive messages.
   `running` rows older than `STALE_RUNNING_MS` (default **15 min**, a config
   constant) to `pending` so they re-run.
 - **Failures.** Increment `attempts`, store `last_error`, and retry with a fixed
-  MVP schedule: **3 attempts** at **1 min → 5 min → 30 min**. After the cap the
-  daemon marks the row `failed` and writes a note to the conversation log (the
-  transcript when installed; otherwise dropped). (A tunable backoff policy is
-  deferred.)
+  MVP schedule. The design had **3 attempts** at 1 min → 5 min → 30 min and a
+  note to the conversation log after the cap. As built, a job is retried after
+  **1 min**, then **5 min**; the third failure marks the row `failed` and
+  sends no notification. The 30 min step is used only by the approval outbox.
+  (A tunable backoff policy is deferred.)
 - **Serialized turns.** p-queue concurrency 1 keeps LLM turns from overlapping.
 
 ## Testing

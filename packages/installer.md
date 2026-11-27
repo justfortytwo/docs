@@ -55,16 +55,24 @@ gitignored `.fortytwo/identity.json`; neither is ever committed.
 | `status` | Show whether fortytwo, the Telegram bridge and the scheduler are running, and whether memory is configured; a `Job tools` line shows the scheduler's MCP entry. Exits 0 when running, 3 when not (usable as a health check). |
 | `stop` | Stop this project's `fortytwo start`. Signals only the process recorded in `.fortytwo/runtime.json`, and only while its heartbeat is fresh **and** its OS process-start identity matches; never looks for processes by name. |
 | `init` | Install missing engine packages, pin the CLI into the project and install the `fortytwo` launcher, capture identity (interactive or flags/env for CI), write `.fortytwo/identity.json` + `.env`, wire `.mcp.json`, render the persona, copy the skills the built-in schedules call into `.claude/skills/`, ask which built-in schedules to run (`--schedules all|none|<kind,kind>` when non-interactive; stored in `.fortytwo/schedules.json`) and save the owner's time zone when none is saved and it is not UTC (`update` never touches it), provision local infra (embedder model, memory DB migration plus the scheduler's `jobs` migration via `runSchedulerMigrations`), record the installed version set. |
-| `pair` | Issue a one-time `/login` pairing code, persisted to the bridge's bindings db (dynamic counterpart of the static `ALLOWED_CHAT_IDS` allowlist). Refuses when Telegram isn't running, unless `--force`. |
-| `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), whether the optional safety gate is on, and the scheduler's job tools (see [Scheduler job tools](#scheduler-job-tools)). |
-| `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline, refresh the shipped skills in `.claude/skills/` (a same-named skill you wrote yourself is left alone), then run `doctor`. `--dry-run` reports without installing. |
+| `pair` | Issue a one-time `/login` pairing code, persisted to the bridge's bindings db (dynamic counterpart of the static `ALLOWED_CHAT_IDS` allowlist). Refuses when Telegram isn't running, unless `--force`. `--ttl <seconds>` overrides the code's lifetime; `--channel` accepts only `telegram`. |
+| `doctor` | Health-check the engine: gate package compatibility (`POLICY_SCHEMA_VERSION`), memory's `MEMORY_TOOL_CONTRACT_VERSION`, migrated DB, installed sibling versions vs. the declared compatibility ranges, embedder model present (warn-only), whether the optional safety gate is on, the scheduler's job tools (see [Scheduler job tools](#scheduler-job-tools)), and a warn-only scheduler daemon check (its heartbeat file `scheduler.heartbeat` next to the DB, stale after 90 s). |
+| `update` | Resolve the latest in-range version of each **installed** engine package, plus `@justfortytwo/transcript` when memory is installed and transcript is missing, install it, rotate the rollback baseline and run `doctor`. When that passes it reconciles (refreshes the shipped skills in `.claude/skills/`, leaving a same-named skill you wrote yourself alone; re-wires `.mcp.json`; Oneiros; chat migration) and runs `doctor` again. When nothing changed it only reconciles. Refuses while `fortytwo start` or a scheduler with a fresh heartbeat is running, and when the project's installer is newer than the one invoked; otherwise pins the invoked installer into the project with `--save-exact` when it differs. `--dry-run` (`-n`) reports without installing. |
 | `rollback` | Re-install the previous version set recorded before the last `update`, then run `doctor`. Manual by design, never auto-triggered. |
-| `enrich` | Capture more answers to deepen the persona, then re-render (no clobber). |
+| `enrich` | Not implemented yet: the command exits with an error. |
 | `onboard` | Review and save the owner profile drafted by persona's `onboarding` skill (see [Owner onboarding](#owner-onboarding)). Shows each change with its source and saves only what the owner confirms in a terminal. `--dry-run` only shows; `--draft <path>` reviews another file. |
-| `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until`, previewed and confirmed (or `--yes`). Owner-only: deletes via the memory library API, never exposed to the assistant. |
-| `unbind` | Revoke a channel binding (un-pair a chat / drop it from the allowlist). |
+| `forget` | Permanently delete memories selected by `--id` / `--query` (semantic) / `--tag` / `--source` / `--since`/`--until`, previewed and confirmed (or `--yes`). `--limit` caps matches (default 50); `--db-path` picks the DB. Owner-only: deletes via the memory library API, never exposed to the assistant. |
+| `unbind` | Remove channel bindings from `.fortytwo/identity.json` (`--chat-id <id>` or `--all`, optionally `--channel <name>`) and print the chat ids to remove from `ALLOWED_CHAT_IDS` in `.env` by hand. It does not edit `.env` and does not revoke a chat paired with `fortytwo pair` (the bridge's bindings db is untouched). |
 | `gate` | Show or change the optional safety gate: `gate on` holds outward and destructive actions for approval, `gate off` removes it. Off by default; restart Fortytwo to apply. See [The safety gate](#the-safety-gate-optional). |
-| `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking; `--timezone <IANA name\|utc>` sets the zone the built-in times (and Oneiros) are read in, and `--list` prints it (`Times are in <zone>`). In a terminal it also asks for the zone; a name that is not a time zone exits 2 and saves nothing. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
+| `schedules` | Show or change which built-in schedules run (daily briefing, open-thread sweep, weekly learn-review). In a terminal it asks about each one; `--list` only shows; `--set all\|none\|<job,job>` decides without asking; `--timezone <IANA name\|utc>` sets the zone the built-in times (and Oneiros) are read in, and `--list` prints it (`Times are in <zone>`). `--timezone` with a name that is not a time zone exits 2 and saves nothing. In a terminal it also asks for the zone; an answer that is not a time zone keeps the current one. Touches only `.fortytwo/schedules.json`; restart Fortytwo to apply. Use this on an existing install instead of re-running `init`. |
+
+`init` options: `--yes`/`-y` (no prompts), `--answers <file.json>`, one
+`--<field>` flag per persona manifest field (or `FORTYTWO_<KEY>` in the env),
+`--telegram-bot-token`, `--allowed-chat-ids`, `--ollama-base-url`,
+`--schedules`, `--db-path` (default `db/fortytwo.db`) and `--no-install`.
+`FORTYTWO_INSTALLER_SPEC` replaces the CLI install spec (e.g. a local tarball).
+
+`fortytwo --version` prints the version of the CLI the project runs.
 
 ## Versioning and compatibility
 
@@ -78,8 +86,8 @@ peer resolution:
     "@justfortytwo/memory": "2.0.0",
     "@justfortytwo/gate": "^1.0.0",
     "@justfortytwo/persona": "1.1.0",
-    "@justfortytwo/telegram": "1.1.0",
-    "@justfortytwo/scheduler": "2.0.0",
+    "@justfortytwo/telegram": "1.2.0",
+    "@justfortytwo/scheduler": "2.1.0",
     "@justfortytwo/transcript": "^1.0.1"
   }
 }
@@ -113,7 +121,8 @@ The launcher holds no version and no project path: it finds the nearest
 directory containing `.fortytwo/` and runs that project's own pinned
 `node_modules/.bin/fortytwo`, but only if you own that project's `.fortytwo/` and
 CLI, so code another user plants in a shared directory is never run. It never
-replaces a `fortytwo` it did not write.
+replaces a `fortytwo` it did not write. There is no launcher on Windows; run
+`npx fortytwo` from the project there.
 
 ## The safety gate (optional)
 
@@ -219,9 +228,10 @@ memory, other env keys kept): the assistant's `enqueue_job` / `list_jobs` /
 `cancel_job` tools (see [scheduler](./scheduler.md#agent-job-tools)). A
 scheduler without that bin gets no entry, and an entry this CLI wrote earlier is
 removed. `status` shows a `Job tools` line; `status` and `doctor` warn when the
-entry is missing, points at a different database than memory, or is held by the
-safety gate. Persona's `context/INDEX.md` tells the agent to use these tools;
-an existing install receives it on the next `fortytwo init`.
+entry is missing, launches `fortytwo-scheduler-mcp` while the installed
+scheduler does not ship it, points at a different database than memory, or is
+held by the safety gate. Persona's `context/INDEX.md` tells the agent to use
+these tools; an existing install receives it on the next `fortytwo init`.
 
 ## MCP extensions and the transcript
 
@@ -248,8 +258,10 @@ the `fortytwo-memory` entry of `.mcp.json`:
   share one npx prefix; `-p` for each package guarantees that.
 - **`update` re-wires `.mcp.json` first** (`reconcileRuntime`), before the chat
   migration, so moving chat out of memory never leaves the agent without
-  transcript search. The `doctor` results `update` prints come from a run
-  after this reconciliation, so they show the re-wired entry.
+  transcript search. When the `doctor` run before reconciliation passes, the
+  results `update` prints come from a second run after it, so they show the
+  re-wired entry. When it fails, `update` prints those results and stops
+  without reconciling.
 - **`doctor`** has a warn-only `mcp extensions` check: it warns if transcript
   is installed but not listed in `FORTYTWO_MCP_EXTENSIONS` (re-run
   `fortytwo init`), if the variable names a package that is not installed or

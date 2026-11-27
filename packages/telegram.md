@@ -44,20 +44,34 @@ lifecycle entirely to runner; it makes no provider or model decisions.
    previous message in that chat (conversation log, channel `scheduler`; at
    most the latest 5, each cut at 3000 characters) are put in front of the
    next inbound message (since 1.0.5; needs `@justfortytwo/transcript`). The
-   bridge marks both as context, not as new instructions.
+   bridge marks both as context, not as new instructions. It tracks this
+   with a per-chat cursor (`scheduledSeen` in the state file): a chat's first
+   message with no cursor carries none, at most the last 2000 log entries are
+   scanned, and only messages that reach Claude advance the cursor (not
+   `/login`, `/logout` or `/start`).
+5. **Local commands.** `/start` gets a fixed online notice from the bridge
+   and never reaches Claude. Other `/command` text reaches Claude marked as
+   a Telegram bot command, not a Claude Code slash command.
 
 ### Attachments
 
 Inbound messages can carry attachments: photos (`telegram_photo`), documents
 (`telegram_document`), voice notes (`telegram_voice`) and audio files
 (`telegram_audio`). Each is downloaded within the byte limit,
-stored under the inbox store dir as `<chat>/<message>` with the extension
-derived from the real mime type, and handed to the session as an
-untrusted-content attachment with a gate provenance envelope. Telegram never
-sends a file name for voice notes, and the bridge does not invent one: when
-the update carries no `file_name`, the stored name comes from the message and
-file ids, as with the other attachment kinds. The bridge skips files over the
-download limit and reports them.
+stored under the inbox store dir as `<chat>/<message>[-<n>].<ext>` (`<n>` is
+the attachment index, omitted for the first), and handed to the session as an
+untrusted-content attachment with a gate provenance envelope. The extension
+comes from Telegram's declared mime type (photos are always `image/jpeg`),
+else from the file name's extension, else `bin`; bytes are not sniffed.
+Telegram never sends a file name for voice notes, and the bridge does not
+invent one: the stored name is built from the chat id, message id and
+attachment index for every kind. The bridge skips files over the download
+limit and reports them.
+
+The limit and the store dir come from `config/adapters.toml`:
+`[attachments] max_bytes` (default 26214400, 25 MiB) and `store_dir`
+(default `inbox`, relative to `FORTYTWO_ROOT`). `[channel.telegram] enabled`
+is parsed but the bridge does not read it.
 
 Limitation: the agent receives the stored file path only; nothing transcribes
 audio yet. Transcription, video and video-note ingestion, and richer handling
@@ -101,7 +115,9 @@ underlying session data to remain available.
 An unexpected Claude exit removes the live mapping, retains the last known
 ID, and reports an error if input was awaiting a result. The next message
 attempts resumption; there is no automatic restart supervisor or input
-replay.
+replay. One exception: an input rejected because the process had already
+died (before its exit event was seen) is sent once more to a resumed
+session.
 
 SIGINT/SIGTERM abort polling, stop new session work and deterministically
 close live RunnerSessions.
@@ -120,7 +136,10 @@ channel side:  /login <code>                  ->  verify(chatId, code) -> bindin
 - `issueChallenge(owner)` mints a **single-use, short-TTL** code (default 6
   digits, 5 minutes). The owner relays it out-of-band to the chat to bind.
 - `/login <code>` verifies it and persists a binding
-  `(channelType, channelUserId) -> owner`.
+  `(channelType, channelUserId) -> owner`. A chat that already holds a
+  binding is refused ("already paired") until it sends `/logout`.
+- Only private chats can pair or be authorized: group and channel chat IDs
+  (negative) are always dropped, even if listed in `ALLOWED_CHAT_IDS`.
 - `/logout` removes the binding and closes the live session (recovery IDs
   remain).
 - Every inbound message is authorized against **persisted bindings ∪ the
@@ -141,7 +160,7 @@ is self-owned:
 
 | Implementation | Role |
 | --- | --- |
-| `SqliteBindingStore` | default: a tiny `better-sqlite3` db in its own file (`state/telegram-bindings.db`) holding bindings + pending challenges |
+| `SqliteBindingStore` | default: a tiny `better-sqlite3` db in its own file (the bridge uses `state/telegram-bindings.db`; the constructor alone defaults to `telegram-bindings.db` in the cwd) holding bindings + pending challenges |
 | `MemoryBindingStore` | in-process Map, for tests / ephemeral use |
 | `BindingStore` | the injectable interface |
 
@@ -153,17 +172,19 @@ a memory-backed `BindingStore`; the login flow is unaffected.
 | Package | Used for | Contract |
 | --- | --- | --- |
 | `@justfortytwo/runner` (pinned `1.0.1`) | Claude process/session lifecycle | library API |
-| `@justfortytwo/gate` (regular dep) | `createSourceEnvelope` provenance helper in `attachments.ts`; the *policy hook* stays optional and separately configured | `POLICY_SCHEMA_VERSION` |
-| `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the shared DB at startup; recall happens inside the headless `claude` turn via the memory MCP tools | `MEMORY_TOOL_CONTRACT_VERSION` |
-| `@justfortytwo/transcript` *(new, optional peer, loaded dynamically)* | the `ConversationLog` implementation that persists each channel event (see below) | `createTranscript` / `prepareTranscript` |
+| `@justfortytwo/gate` (regular dep `^1.0.0`) | `createSourceEnvelope` provenance helper in `attachments.ts`; the gate's approval store for opt-in Telegram approvals; the *policy hook* stays optional and separately configured | `createSourceEnvelope`, `JsonlApprovalStore`, `approvalsPath`, `ApprovalStore` (type) |
+| `@justfortytwo/memory` (optional peer, loaded dynamically) | opens + migrates the shared DB at startup and builds the embedder; recall happens inside the headless `claude` turn via the memory MCP tools | `openDb`, `runMigrations`, `OllamaEmbedder`, `FakeEmbedder` |
+| `@justfortytwo/transcript` *(new, optional peer `^1.0.0`, loaded dynamically)* | the `ConversationLog` implementation that persists each channel event, and the cursor API that reads scheduler messages back (see below) | `prepareTranscript`, `createTranscript`; optional `transcriptHead`, `transcriptDelta` |
 | `@justfortytwo/scheduler` (optional peer `^2.0.0`, loaded dynamically) | the reply queue: the `jobs` table and job API | `runSchedulerMigrations`, `enqueue`, `existsPending` |
 
 If the memory peer is absent, the bridge degrades to **channel-only**
 (messages relay but are not persisted) rather than refusing to start.
 
-The reply queue (a reply that could not be delivered inline, left for the
-scheduler as a `reply` job) needs memory **and** the scheduler, which owns the
-`jobs` table since 2.0.0. The bridge runs `runSchedulerMigrations` after
+The reply queue needs memory **and** the scheduler. It carries one thing:
+the "Something went wrong" notice the bridge sends after a handler error,
+when that notice also fails to send inline. It becomes a `reply` job for the
+scheduler, deduped per chat. Normal Claude replies are never queued. The
+scheduler owns the `jobs` table since 2.0.0. The bridge runs `runSchedulerMigrations` after
 memory's migrations and checks `existsPending` before it enqueues. Without the
 scheduler, or with one older than the job API, such replies are dropped and the
 bridge says so on stderr. memory is accepted as `^0.1.5 || ^1.0.0 || ^2.0.0`.
@@ -175,7 +196,10 @@ writes every inbound and outbound event through a small port it defines
 itself, `ConversationLog` (`src/conversation-log.ts`):
 
 ```ts
-interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
+interface ConversationLog {
+  append(event: ConversationEvent): Promise<unknown>;
+  scheduledSince?(after: LogCursor | undefined): { cursor: LogCursor; messages: ScheduledMessage[] };
+}
 ```
 
 - The port is structural: telegram imports no transcript or memory types for
@@ -183,7 +207,10 @@ interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
   and optional `threadId` and `meta`.
 - `loadConversationLog(h, embedder)` dynamically imports
   `@justfortytwo/transcript`, calls `prepareTranscript` and
-  `createTranscript`. If transcript is not installed, or loading fails, it
+  `createTranscript`. When transcript also has `transcriptHead` and
+  `transcriptDelta`, it adds `scheduledSince` (built by the exported
+  `scheduledReader`), which feeds the scheduler-message context. If
+  transcript is not installed, or loading fails, it
   logs to stderr and returns `noopConversationLog`, preserving channel-only
   behavior. The bridge's composition root uses the no-op when memory itself is
   absent.
@@ -197,15 +224,15 @@ interface ConversationLog { append(event: ConversationEvent): Promise<unknown> }
 | Var | Required | Meaning |
 | --- | --- | --- |
 | `TELEGRAM_BOT_TOKEN` | yes | Bot token. The bridge is the **only** long-poller on this bot. |
-| `ALLOWED_CHAT_IDS` | no | Chat IDs authorized without a binding. |
+| `ALLOWED_CHAT_IDS` | no | Comma-separated private-chat IDs authorized without a binding. Negative (group/channel) IDs are always refused. |
 | `CLAUDE_BIN` | no | Path to `claude` (default `claude`). |
 | `FORTYTWO_CLAUDE_ARGS` | no | Extra arguments for every `claude` run, as a JSON array of strings (e.g. `["--chrome"]`). Set by `fortytwo start -- <args>`. A malformed value stops the bridge at boot. |
 | `TELEGRAM_APPROVALS` | no | `1`/`true`/`yes`/`on` lets authorized chats approve or deny actions held by the gate's hook. Off by default; `fortytwo start` sets it when the gate is on (`fortytwo gate on`). |
-| `TELEGRAM_BINDINGS_DB` | no | Bindings db path (default `state/telegram-bindings.db`). |
-| `DB_PATH` | no | Memory db path (default `db/fortytwo.db` relative to `FORTYTWO_ROOT`). |
-| `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Embedder handed to the conversation log (vectors are produced in the background). |
+| `TELEGRAM_BINDINGS_DB` | no | Bindings db path, relative to `FORTYTWO_ROOT` (default `state/telegram-bindings.db`). |
+| `DB_PATH` | no | Memory db path, relative to `FORTYTWO_ROOT` (default `db/fortytwo.db`). |
+| `EMBED_MODEL` / `OLLAMA_BASE_URL` | no | Ollama embedder handed to the conversation log (vectors are produced in the background). Without `EMBED_MODEL` the log gets memory's deterministic `FakeEmbedder`. |
 | `ASSISTANT_NAME` / `ASSISTANT_ACTOR` / `OWNER_ACTOR` | no | Display name + conversation-log actor labels. Keep `OWNER_ACTOR` at its default `owner`: Oneiros counts only inbound Telegram messages with actor `owner` as owner evidence, so another label stops persona consolidation from learning from chat. |
-| `FORTYTWO_ROOT` | no | Working root for the headless `claude` process + state files (`FORD_ROOT` is a deprecated alias). |
+| `FORTYTWO_ROOT` | no | Working root for the headless `claude` process + state files (`FORD_ROOT` is a deprecated alias). Default: the package directory (the parent of `dist/`). |
 
 Proxy auth for the headless `claude` session is not read here. The CLI reads
 `ANTHROPIC_*` from its own config. The bridge also loads
@@ -223,6 +250,13 @@ supervises it together with the scheduler. Attachments: photo/document
 captions are preserved in the same Claude turn as attachment details and
 in inbound conversation-log text; message text takes precedence when present.
 
+Exports: the package root (`dist/index.js`) exposes the transport, attachment,
+binding, login and conversation-log APIs, plus `telegramNotifier` (a
+scheduler `Notifier` for one chat) and `enqueueReply` (the deduped reply-job
+enqueuer). The `./bridge` subpath exposes the bridge module itself, including
+`withTelegramOutputPrompt`, `TELEGRAM_OUTPUT_PROMPT`, `createBridgeSessions`,
+`handleInbound` and `pollLoop`.
+
 ## Notable API history
 
 `1.0.0-4` removed approval buttons for deferred tools (intentional public API
@@ -232,8 +266,9 @@ never submit a Claude turn or change approval state.
 
 `1.0.3` brought approval buttons back as an opt-in (`TELEGRAM_APPROVALS`),
 built on the gate's approval store instead of bridge-owned state, with new
-exports `Approvals`, `approvalsEnabled`, `formatApprovalRequest` and
-`ChatSessions.resume()`. Without the setting, the `1.0.0-4` behavior applies.
+exports `Approvals` (type), `approvalsEnabled` and `formatApprovalRequest`;
+the internal `ChatSessions` class (not exported) gained `resume()`. Without
+the setting, the `1.0.0-4` behavior applies.
 
 `1.2.0` adds the Telegram output note (see Session lifecycle and recovery).
 

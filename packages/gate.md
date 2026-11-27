@@ -2,8 +2,10 @@
 
 A standalone, agent-agnostic **PreToolUse safety gate** for Claude Code. It
 checks each call *before any tool runs*: a safe call auto-runs, a risky one
-waits for a one-shot human approval, and a forbidden one is denied outright. It is **fail-closed**: anything
-unrecognized, and anything that errors, is blocked rather than waved through.
+waits for a one-shot human approval, and a forbidden one is denied outright.
+It is **fail-closed**: any error while deciding a PreToolUse call is denied. A
+hook event that is empty, unparseable or not PreToolUse is allowed, because
+there is no tool call to gate.
 
 - **Version:** `1.0.0` · **Runtime:** Claude Code plugin, PreToolUse hook, or
   plain library · **Node:** >= 18 · **Leaf package**: no `@justfortytwo/*`
@@ -83,9 +85,12 @@ ignores `defer`.
 3. The agent re-fires the same call. The gate **consumes the one-shot exactly
    once** and allows it; any later re-fire is denied.
 
-`approve`/`deny` only act on a **pending** call. An already-consumed or
-denied one-shot is immutable, so an approval can never be resurrected into a
-second run.
+A gated call with no `tool_use_id` cannot be keyed as a one-shot, so it is
+denied instead of deferred.
+
+`approve` only acts on a **pending** call. `deny` also revokes an approval that
+has not been consumed yet. Executed, denied and expired one-shots are
+immutable, so an approval can never be resurrected into a second run.
 
 ## The `fortytwo-gate` CLI
 
@@ -127,6 +132,18 @@ There is also a content-trust policy engine (`decidePolicy`,
 instruct the agent?"* question: the trusted/untrusted boundary when
 ingesting web pages, messages, or tool output.
 
+Other exports:
+
+- Manifest and classifier: `classify`, `parseManifest`, `parseToml`.
+- Stores and CLI: `NullAuditLogger`, `runCli` / `CliOptions`.
+- Bash allowlist: `readBashAllowlist`, `findBashAllowlistMatch`,
+  `bashAllowlistPath`, `appendExactBashAllowlistEntry` (exact, escaped entry
+  with a TTL of `DEFAULT_BASH_ALLOW_TTL_HOURS`, 24), `escapeGlobLiteral`,
+  `globToRegExp`.
+- Content trust: `createSourceEnvelope`, `defaultMemoryClassForSource`,
+  `recallPriorityForMemoryClass`, `rankRecall`, `renderContextPack`.
+- Subpath `@justfortytwo/gate/gate-hook`: the hook entry itself.
+
 ## Configuration
 
 | Env var | Default | Purpose |
@@ -143,7 +160,9 @@ directory; without it, the hook event's `cwd`.
 ## File formats
 
 **Manifest** (TOML, see `examples/capabilities.toml`): `default_tier`
-(recommended `external`); `[tiers]` exact tool name → tier plus trailing-`*`
+(recommended `external`). A manifest without `default_tier` falls back to
+`internal`, an auto-allow tier, so unlisted tools pass; the shipped manifests
+set `external`. `[tiers]` exact tool name → tier plus trailing-`*`
 prefix globs; `[bash]` regex patterns that only ever **elevate** Bash (and
 double as the denylist, highest match wins); `[guard].files` lists project-relative
 paths whose edit is `irreversible` (point at the manifest, settings and

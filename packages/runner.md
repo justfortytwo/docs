@@ -61,12 +61,15 @@ Guarantees and semantics:
   response. Listen for `result` to observe turn completion.
 - Concurrent sends serialize in invocation order; Claude controls processing
   of queued turns. Inputs sent mid-turn steer that turn (several inputs can
-  share one `result`; the runner passes `--replay-user-messages` so `input`
-  events fire when Claude consumes a submission).
+  share one `result`; the runner passes `--replay-user-messages` so an
+  `{ type: 'input' }` event is published on `event` when Claude consumes a
+  submission).
 - Output is decoded incrementally as UTF-8 JSONL, including fragmented lines
   and an unterminated final line. Malformed lines surface as a raw string plus
   `RunnerProtocolError` (`.line`, `.cause`), and parsing continues. Stderr is
   diagnostic, not automatically fatal.
+- `send()` after `close()`, after exit, or after a stdin failure rejects with
+  `RunnerClosedError`; `close()` rejects outstanding writes the same way.
 - Session state: `starting` → `ready` → `running` → `closed`/`failed`, plus
   `sessionId`, `startedAt`, `lastActivityAt`, `exitCode`, `exitSignal`, and a
   copied/frozen `config`. The runner captures session IDs from Claude output
@@ -76,7 +79,7 @@ Events:
 
 | Listener | Payload |
 | --- | --- |
-| `event` | `RunnerEvent`, a discriminated union of all events |
+| `event` | `RunnerEvent`, a discriminated union of all events, including `{ type: 'input', raw }`, which has no listener of its own |
 | `raw` | Parsed Claude event, or original malformed line |
 | `assistant` | `{ type: 'assistant', text, raw }` for assistant text |
 | `result` | `RunResult` for each Claude result event |
@@ -112,15 +115,18 @@ caller must keep its own process alive and close sessions during shutdown.
 `claudeArgsFromEnv(env?)` reads operator-supplied Claude arguments from
 `FORTYTWO_CLAUDE_ARGS` (a JSON array of strings such as `["--chrome"]`) and
 returns them validated, throwing a `TypeError` that names the variable
-otherwise. `createRunner` never reads the variable itself: a caller passes the
-result as `args` where operator arguments should apply (the Telegram bridge and
-the scheduler daemon do) and leaves it out for locked-down runs.
+otherwise. The variable name is exported as `CLAUDE_ARGS_ENV`.
+`createRunner` never reads the variable itself: a caller passes the result as
+`args` where operator arguments should apply (the Telegram bridge and the
+scheduler daemon do) and leaves it out for locked-down runs.
 
 Per-call arguments **append** to defaults; environment overlays copy onto the
 parent environment (defaults first, per-call last); caller objects are never
-mutated. The runner owns the format flags (`-p --input-format stream-json
---output-format stream-json --verbose`; `--resume <id>` for resumption) and
-rejects conflicting format arguments. **No permission-bypass flags are added.**
+mutated. The runner owns the format flags: `-p --output-format json` for
+`run()`, and `-p --input-format stream-json --output-format stream-json
+--verbose --replay-user-messages` for sessions, plus `--resume <id>`. It
+rejects caller `--input-format`/`--output-format` and any argument containing
+NUL. **No permission-bypass flags are added.**
 All other Claude configuration (including alternative compatible providers,
 via `env` such as `ANTHROPIC_BASE_URL`) passes through without provider
 branches.

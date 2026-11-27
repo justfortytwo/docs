@@ -50,6 +50,8 @@ const candidates: Candidate[] = await extractor.extractSalient({
 | `Candidate` | a distilled, scored memory, aligned with memory's `EnrichmentCandidate`, so candidates flow into `enrich()` with no remapping |
 | `LlmClient` | the injected, minimal completion seam |
 | `SalienceExtractor` | the extraction contract; `extractSalient(turn, opts)` → scored `Candidate[]` |
+| `ExtractOptions` | `minSalience`, `maxCandidates`, `defaultObserved` |
+| `ModelSalienceExtractor` | the reference extractor class; `new ModelSalienceExtractor(llm)` |
 | `createSalienceExtractor(llm)` | the reference implementation: frames the task, runs the client, parses, scores, filters, stamps provenance |
 | `SALIENCE_SYSTEM_PROMPT` | the exported system framing: a plain `const` to read or override when tuning extraction policy without forking |
 
@@ -67,7 +69,8 @@ Each object needs `content` (non-empty) and `salience` (0-1); `source`,
 fail-soft**: the array is extracted even from prose- or fence-wrapped output,
 malformed items are skipped, `salience` is clamped to `[0,1]`, and unparseable
 output yields `[]`, never a throw, because one bad turn must not crash an
-enrichment loop. Candidates inherit the turn's
+enrichment loop. Errors thrown by `llm.complete()` are not caught: they
+reject `extractSalient`. Candidates inherit the turn's
 `source`/`observed`/`date` where the model leaves them blank
 (`opts.defaultObserved` is the final fallback).
 
@@ -83,7 +86,9 @@ turn ──> @justfortytwo/salience (extract + score) ──> Candidate[]
                               @justfortytwo/memory.enrich (dedupe / supersede / write)
 ```
 
-memory references salience from `src/enrichment.ts` (the salience step).
+memory mirrors salience's `SalienceExtractor` shape in `src/enrichment.ts`
+without importing it. The host builds an extractor with
+`createSalienceExtractor` and passes it to memory's `enrichFromTurn`.
 salience is a **pure npm engine**, not a Claude Code plugin.
 
 ## Testing

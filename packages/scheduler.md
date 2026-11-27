@@ -52,6 +52,11 @@ await tick({
 `Handler` shape: `{ kind, run(ctx), hasWork?(ctx) }`. A `hasWork` gate is the
 cheap check that runs **before** an LLM turn is spent.
 
+The package also exports the daemon (`startDaemon`, `DaemonOptions`),
+`buildRegistry` and `RECURRING_DEFS`, the MCP server (`createJobsServer`,
+`SCHEDULER_MCP_ID`), the agent-job rules and limits, and the
+`schedules.json` helpers; see `src/index.ts`.
+
 ## Jobs queue
 
 The `jobs` table and the job API used to live in `@justfortytwo/memory`; since
@@ -82,6 +87,11 @@ Exports: `enqueue`, `claimDue`, `complete`, `fail`, `listActive`,
   claims at the same moment is reported as running.
 - `countPendingApprovals` (the `sweep` gate) stays in memory, which owns the
   `approvals` table.
+- **Retries.** A job whose run or gate throws is retried after 1 min, then
+  5 min; the third failure marks it `failed` with `last_error`
+  (`MAX_ATTEMPTS = 3`) and sends no notification. This applies to recurring
+  rows too; a built-in kind gets a fresh row at the next boot. At boot,
+  `running` rows older than 15 min (`STALE_RUNNING_MS`) go back to `pending`.
 
 ## Job kinds (as built)
 
@@ -196,7 +206,9 @@ Rules (`src/agent-jobs.ts`):
   reaches a prompt as `Reminder: <text>`, so the server treats it as untrusted
   and rejects other keys, newlines and control characters.
 - **`run_at`:** ISO-8601 with `Z` or an offset, or without one plus `timezone`
-  (IANA); stored as UTC. Malformed values and times in the past are rejected.
+  (IANA); stored as UTC. Malformed values and times in the past are rejected,
+  and so are an offset together with `timezone`, and `timezone` without
+  `run_at`.
 - **`recurrence`:** a cron read in the install time zone, at most once an hour.
   Without `run_at` the first run is the cron's next one.
 - **Cap:** at most 20 active agent jobs, checked in the insert's write
@@ -238,6 +250,8 @@ prompt through `@justfortytwo/runner` in an isolated temporary cwd:
 No tools, MCP, skills or session persistence are enabled; maintenance emits no
 notification into memory. Authentication/provider configuration is preserved.
 Requires a Claude CLI with `--safe-mode`; unsupported flags **fail closed**.
+The worker runs with `CLAUDECODE` and `CLAUDE_CODE_SESSION_ID` unset, is
+capped at 120 s, and its response is rejected above 16 384 bytes.
 
 ## Running it
 
@@ -247,17 +261,20 @@ supervises it together with the Telegram bridge.
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DB_PATH` | yes | absolute path to `fortytwo.db` |
+| `DB_PATH` | recommended | path to the database (default `fortytwo.db` in the working directory); the heartbeat is written next to it |
 | `EMBED_MODEL` | recommended | Ollama embedding model (falls back to FakeEmbedder) |
 | `OLLAMA_BASE_URL` | no | default `http://localhost:11434` |
 | `CLAUDE_BIN` | no | `claude` CLI path the runner spawns (default: `claude` on `PATH`) |
 | `FORTYTWO_CLAUDE_ARGS` | no | Extra arguments for every `claude` run, as a JSON array of strings (e.g. `["--chrome"]`). Set by `fortytwo start -- <args>`. Applies to scheduled runs, not to the Oneiros worker. A malformed value stops the daemon at boot. |
-| `FORTYTWO_TURN_TIMEOUT` | no | per-turn timeout in seconds (default `300`) |
 | `TELEGRAM_BOT_TOKEN` | optional | enables Telegram push notifications |
 | `ALLOWED_CHAT_IDS` | optional | comma-separated chat IDs; when set, push goes to the first id. When unset, push goes to every chat paired with `fortytwo pair` |
 | `FORTYTWO_ROOT` | no | project root: holds `.fortytwo/schedules.json`, `.claude/skills` and the Telegram bindings db (default: working directory) |
 | `CLAUDE_CONFIG_DIR` | no | Claude Code config dir, checked for user-level skills (default `~/.claude`) |
 | `TELEGRAM_BINDINGS_DB` | no | bindings db path relative to the root (default `state/telegram-bindings.db`); must match the bridge |
+
+Scheduled turns have no timeout: the daemon creates its runner without one,
+and `FORTYTWO_TURN_TIMEOUT` is not read. Only the Oneiros worker is capped, at
+120 s.
 
 ### Liveness
 
@@ -296,13 +313,18 @@ actor `assistant` and kind = the notification kind.
 ## Dependencies
 
 - `@justfortytwo/memory` (pinned `2.0.0`): the database handle (`openDb`),
-  `applyMigrations`, the approvals outbox and `countPendingApprovals`.
+  `applyMigrations`, the approvals outbox and `countPendingApprovals`, plus
+  `memoryHead`/`memoryDelta` (Oneiros), `query` (the `learn_review` gate),
+  `reembed` and the embedders.
 - `@justfortytwo/runner` (pinned `1.0.1`): LLM turns for handlers.
-- `@modelcontextprotocol/sdk`: the `fortytwo-scheduler-mcp` server.
+- `@modelcontextprotocol/sdk` (`^1.32.2`): the `fortytwo-scheduler-mcp` server.
+- `croner` (`^10.0.0`): next-run computation for crons.
+- `p-queue` (`^9.0.0`): the concurrency-1 run queue.
 - `@justfortytwo/persona` (pinned `1.0.2`): Oneiros `hasWork`/`refine`/
   `workerPrompt`.
-- `@justfortytwo/telegram`: **optional peer**; enables the Telegram notifier.
-- `@justfortytwo/transcript` *(new)*: **optional peer**; receives journal
+- `@justfortytwo/telegram` (`^0.1.5 || ^1.0.0`): **optional peer**; enables
+  the Telegram notifier.
+- `@justfortytwo/transcript` (`^1.0.0`): **optional peer**; receives journal
   entries and serves the Oneiros transcript stream.
 
 ## Testing

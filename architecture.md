@@ -48,9 +48,11 @@ channels / scheduler
         |
         +---- fortytwo memory (facts)
         |        + transcript tools (extension seam)
+        |
+        +---- fortytwo-scheduler MCP (job tools)
 
 optional surrounding components:
-- gate
+- gate (enforcement optional; the package is always installed)
 - salience
 
 bootstrap / distribution / documentation:
@@ -72,7 +74,7 @@ bootstrap / distribution / documentation:
 | Telegram transport and Telegram identity | `@justfortytwo/telegram` |
 | Installation and lifecycle management | `@justfortytwo/installer` |
 | Persona and context templates | `@justfortytwo/persona` |
-| External safety/policy enforcement (optional) | `@justfortytwo/gate` |
+| External safety/policy enforcement (optional; package always installed) | `@justfortytwo/gate` |
 | Model-driven salience extraction (optional) | `@justfortytwo/salience` |
 
 A useful rule when deciding where code belongs:
@@ -88,13 +90,17 @@ MCP/plugin rather than a fortytwo-specific browser implementation.
 
 memory holds **facts**; conversation history belongs to
 `@justfortytwo/transcript`. Both live in the same SQLite file (`fortytwo.db`)
-but in separate tables, and there is one MCP server, not two.
+but in separate tables, and there is one MCP server for both, not two. The
+scheduler ships a separate MCP server, `fortytwo-scheduler`
+(`fortytwo-scheduler-mcp`), that gives the agent `enqueue_job`, `list_jobs` and
+`cancel_job` on the same database; the agent is a job producer like any
+other.
 
 ```text
 telegram ──┐ ConversationLog.append (injected, fire-and-forget)
 scheduler ─┤                                   ┌─ memory tables (facts)
            └──▶ transcript tables ─────────────┤  same fortytwo.db
-                      ▲                        └─ transcript_* tables
+                      ▲                        └─ transcript + transcript_*
                       │ createMcpExtension
 agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP_EXTENSIONS
           (memory tools + transcript_search / transcript_context)
@@ -126,7 +132,8 @@ agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP
 - **Single writer for job execution.** Producers only insert `pending` rows;
   the scheduler daemon is the single writer of the `running` transition.
 - **No scheduler↔telegram coupling.** Both depend on `runner`; neither requires
-  the other. telegram loads the scheduler's job API lazily (an optional peer)
+  the other (each is an optional peer of the other). The scheduler also
+  depends on `memory` and `persona` (Oneiros); telegram depends on `gate`. telegram loads the scheduler's job API lazily (an optional peer)
   to queue undelivered replies, and drops them when it is absent.
 - **Memory produces no jobs.** The scheduler owns the `jobs` table and job API;
   memory's staged approvals are an outbox the scheduler polls.
@@ -137,5 +144,6 @@ agent ──▶ fortytwo-memory MCP server ──loads──┘ via FORTYTWO_MCP
 and registry, the transcript (conversation log), runner process lifecycle,
 scheduler with durable jobs, Telegram channel.
 
-**Deferred / optional:** gate policy enforcement, salience extraction,
-additional channels beyond Telegram.
+**Deferred / optional:** gate policy enforcement (the gate package itself is
+always installed: telegram depends on it and `fortytwo doctor` requires it),
+salience extraction, additional channels beyond Telegram.

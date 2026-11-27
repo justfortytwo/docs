@@ -38,9 +38,13 @@ oneiros/prompt.md                      # private Oneiros worker prompt
 
 Templates use `{{placeholder}}` tokens. The installer CLI drives the flow:
 
-1. **`fortytwo init`** prompts for each field in `manifest.json` (or accepts
-   flags/env for non-interactive installs) and writes the answers to a
-   **gitignored `.fortytwo/identity.json`**, the single source of truth.
+1. **`fortytwo init`** resolves each field in `manifest.json` from
+   `--answers <file.json>`, then `FORTYTWO_<KEY>` env, then `--<key>` flags,
+   then the manifest default. It prompts only for required fields still
+   empty; optional fields and required ones with a default (`owner_timezone`,
+   `owner_locale`, `owner_languages`, `owner_primary_language`) are never
+   asked. The answers go to a **gitignored `.fortytwo/identity.json`**, the
+   single source of truth.
 2. The CLI renders every `templates/**/*.tmpl` against `identity.json` and
    writes the result into the gitignored `context/` (and `CLAUDE.md` at the
    project root).
@@ -116,10 +120,15 @@ the owner reviews and saves the draft with `fortytwo onboard`
 ## Compatibility
 
 `fortytwo.compat.json` declares the cross-component contract majors this
-persona targets; `fortytwo doctor` reads it and warns on mismatch:
+persona targets. `fortytwo doctor` does not read this file: it checks the same
+majors directly against gate's `POLICY_SCHEMA_VERSION` and memory's
+`MEMORY_TOOL_CONTRACT_VERSION`, and a mismatch fails a required check.
 
 ```json
-{ "memoryToolContract": "^1", "policySchema": "^1" }
+{
+  "name": "@justfortytwo/persona",
+  "fortytwo.compat": { "memoryToolContract": "^1", "policySchema": "^1" }
+}
 ```
 
 ## Oneiros
@@ -133,7 +142,11 @@ cursor and its own state files:
   separate tool-free session (`--safe-mode`, no tools/MCP/skills/session
   persistence); persona exports `initialize(root, head, stream?)`,
   `hasWork(root, memory, transcript?)` and `refine({ root, memory, transcript?, worker })`. The `transcript` source is
-  optional (`{ head(), delta(cursor) }`); without it only memory is read.
+  optional (`{ head(), delta(cursor) }`); without it only memory is read,
+  but `hasWork` and `refine` throw if the transcript stream was already
+  initialised. Also exported: `workerPrompt` (the worker system prompt the
+  scheduler passes to runner), `readCheckpoint(root, stream?)`,
+  `eligibleTranscriptRow` and `transcriptToEvidence`.
 - **Input:** the worker receives a JSON baseline and a bounded memory delta;
   it returns `{ "additions": [] }` or evidence-backed additions.
 - **Mutation boundary (deterministic, enforced in code):** only new
@@ -142,7 +155,9 @@ cursor and its own state files:
   preserves existing bytes, checks evidence IDs and rejects inferred/imported/
   superseded evidence. Eligible evidence is live and
   `observed: "stated"`, with `source: "owner"` or Telegram inbound-message
-  provenance; outbound assistant messages are excluded.
+  provenance; outbound assistant messages are excluded. Caps: at most 5
+  additions per round, each `kind` `fact` or `preference`, at most 300
+  characters, citing 1 to 10 distinct evidence ids.
 - **Transcript eligibility:** a transcript row is eligible only when channel
   is `telegram`, direction `inbound`, kind `message` and actor `owner` (the
   bridge only accepts paired chats). Assistant and scheduler rows are never
@@ -161,7 +176,7 @@ cursor and its own state files:
 - **State:** private under `.fortytwo/oneiros/`, one checkpoint and one
   interrupted-write receipt per stream: `checkpoint.json` / `pending.json`
   (memory) and `transcript-checkpoint.json` / `transcript-pending.json`
-  (transcript), plus PID locks. `hasWork` is true if either stream has new
+  (transcript), plus one shared PID lock (`lock`). `hasWork` is true if either stream has new
   rows or a pending receipt. Any leftover receipt is settled before a round
   reads the shared profile. Writes use fsync + atomic rename. Recovery applies a validated receipt only if the context still
   matches its before/after hash; retries cannot double-apply. Oversized
